@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OMS Dashboard | Trading Terminal</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <span class="pulse"></span>
+                <h1>OMS Terminal</h1>
+            </div>
+            <div class="stats-bar">
+                <div class="stat-card">
+                    <span class="label">STATUS</span>
+                    <span class="value connected" id="connection-status">CONNECTED</span>
+                </div>
+                <div class="stat-card">
+                    <span class="label">ACTIVE POSITIONS</span>
+                    <span class="value" id="active-positions-count">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="label">TOTAL PNL</span>
+                    <span class="value" id="total-pnl">₹0.00</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="dashboard-grid">
+            <!-- Positions Section -->
+            <section class="card open-positions">
+                <div class="card-header">
+                    <h2>Open Positions</h2>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Qty</th>
+                                <th>Avg Price</th>
+                                <th>LTP</th>
+                                <th>PnL</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="positions-body">
+                            <!-- Positions will be injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Bottom Sections -->
+            <div class="bottom-row">
+                <!-- Alerts Log -->
+                <section class="card log-card alerts-log">
+                    <div class="card-header">
+                        <h2>Signal Alerts</h2>
+                    </div>
+                    <div class="log-container" id="alerts-log">
+                        <!-- Alerts will be injected here -->
+                    </div>
+                </section>
+
+                <!-- Order Book -->
+                <section class="card log-card order-book">
+                    <div class="card-header">
+                        <h2>Order Book</h2>
+                    </div>
+                    <div class="log-container" id="orders-log">
+                        <!-- Orders will be injected here -->
+                    </div>
+                </section>
+                
+                <!-- Historical Positions -->
+                <section class="card log-card historical-positions">
+                    <div class="card-header">
+                        <h2>Trade History</h2>
+                    </div>
+                    <div class="log-container" id="history-log">
+                        <!-- History will be injected here -->
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

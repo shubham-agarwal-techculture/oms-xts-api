@@ -2,6 +2,7 @@ require('dotenv').config();
 const XTSMarketDataAdapter = require('./src/adapters/XTSMarketDataAdapter');
 const RESTSignalReceiver = require('./src/adapters/RESTSignalReceiver');
 const XTSOrderExecutor = require('./src/adapters/XTSOrderExecutor');
+const DashboardAdapter = require('./src/adapters/DashboardAdapter');
 const OrderManager = require('./src/core/OrderManager');
 
 async function main() {
@@ -28,17 +29,20 @@ async function main() {
             orderExecutor
         });
 
-        // 3. Connect and Start
+        // 3. Initialize Dashboard (Loosely coupled)
+        const dashboard = new DashboardAdapter(oms, process.env.DASHBOARD_PORT || 3000);
+
+        // 4. Connect and Start
         console.log('Starting OMS...');
         
         await marketData.connect();
-        // marketData.subscribe('1_22'); // Example subscription if needed
-
+        
         signalSource.start();
+        dashboard.start();
         
         oms.init();
 
-        console.log('OMS is running and waiting for signals.');
+        console.log('OMS and Dashboard are running.');
 
     } catch (error) {
         console.error('Failed to start OMS:', error);
@@ -47,3 +51,4 @@ async function main() {
 }
 
 main();
+
