@@ -1,3 +1,17 @@
+// Theme Switcher & Persistence Logic
+const themeToggleBtn = document.getElementById('theme-toggle');
+const savedTheme = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', savedTheme);
+
+if (themeToggleBtn) {
+    themeToggleBtn.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+    });
+}
+
 const socket = io();
 
 /** Keep in sync with server `OMS_UI_STATE_WINDOW` default (500). */
