@@ -222,3 +222,5 @@ td {
 .badge-placed { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
 .badge-filled { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
 .badge-failed { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+.badge-info { background: rgba(245, 158, 11, 0.2); color: var(--accent-orange); }
+.badge-squared_off { background: rgba(146, 153, 166, 0.2); color: var(--text-secondary); }

@@ -32,14 +32,20 @@ class XTSOrderExecutor extends OrderExecutor {
     }
 
     async placeMarketOrder(orderDetails) {
-        if (!this.token) await this.login();
+        // if (!this.token) await this.login();
 
-        const [exchangeSegment, exchangeInstrumentID] = orderDetails.symbol.split('_');
+        let exchangeSegment, exchangeInstrumentID;
+        if (orderDetails.symbol.includes('_')) {
+            [exchangeSegment, exchangeInstrumentID] = orderDetails.symbol.split('_');
+        } else {
+            exchangeSegment = 1;
+            exchangeInstrumentID = orderDetails.symbol;
+        }
 
         const payload = {
-            exchangeSegment: Number(exchangeSegment),
-            exchangeInstrumentID: Number(exchangeInstrumentID),
-            productType: 'MIS', // Default to MIS for market orders
+            exchangeSegment: Number(exchangeSegment) || exchangeSegment,
+            exchangeInstrumentID: Number(exchangeInstrumentID) || exchangeInstrumentID,
+            productType: 'MIS',
             orderType: 'MARKET',
             orderSide: orderDetails.action,
             orderQuantity: orderDetails.quantity,
@@ -54,9 +60,11 @@ class XTSOrderExecutor extends OrderExecutor {
             clientOrderID: `OMS_${Date.now()}`
         };
 
+        console.log(`Payload: ${JSON.stringify(payload)}`);
+
         try {
             console.log(`Placing order: ${orderDetails.action} ${orderDetails.quantity} for ${orderDetails.symbol}`);
-            const response = await this.client.post('/orders', payload);
+            const response = await this.client.post('/interactive/orders', payload);
             return response.data;
         } catch (error) {
             console.error('Order placement failed:', error.response?.data || error.message);
@@ -65,8 +73,38 @@ class XTSOrderExecutor extends OrderExecutor {
     }
 
     async getOrderStatus(orderId) {
-        if (!this.token) await this.login();
-        const response = await this.client.get(`/orders/${orderId}`);
+        // if (!this.token) await this.login();
+        const response = await this.client.get(`/interactive/orders/${orderId}`);
+        return response.data;
+    }
+
+    async getPositions() {
+        // if (!this.token) await this.login();
+        console.log('Fetching positions from XTS...');
+        const response = await this.client.get('/portfolio/positions');
+        return response.data;
+    }
+
+    async squareOffPosition(details) {
+        // if (!this.token) await this.login();
+        let exchangeSegment, exchangeInstrumentID;
+        if (details.symbol.includes('_')) {
+            [exchangeSegment, exchangeInstrumentID] = details.symbol.split('_');
+        } else {
+            exchangeSegment = 1;
+            exchangeInstrumentID = details.symbol;
+        }
+
+        const payload = {
+            exchangeSegment: Number(exchangeSegment) || exchangeSegment,
+            exchangeInstrumentID: Number(exchangeInstrumentID) || exchangeInstrumentID,
+            productType: 'MIS',
+            squareOffMode: 'Full',
+            orderQuantity: details.quantity
+        };
+
+        console.log(`Squaring off position: ${details.symbol} (${details.quantity})`);
+        const response = await this.client.post('/interactive/positions/squareoff', payload);
         return response.data;
     }
 }

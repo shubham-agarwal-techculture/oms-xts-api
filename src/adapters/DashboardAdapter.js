@@ -45,11 +45,15 @@ class DashboardAdapter {
             const onOrder = (data) => socket.emit('order', data);
             const onPositionUpdate = (data) => socket.emit('positionUpdate', data);
             const onPriceUpdate = (data) => socket.emit('priceUpdate', data);
+            const onPositionsSynced = (positions) => socket.emit('positionsSynced', positions);
+            const onHistoryUpdate = (item) => socket.emit('historyUpdate', item);
 
             this.oms.on('alert', onAlert);
             this.oms.on('order', onOrder);
             this.oms.on('positionUpdate', onPositionUpdate);
             this.oms.on('priceUpdate', onPriceUpdate);
+            this.oms.on('positionsSynced', onPositionsSynced);
+            this.oms.on('historyUpdate', onHistoryUpdate);
 
             socket.on('disconnect', () => {
                 console.log('Dashboard client disconnected');
@@ -57,6 +61,8 @@ class DashboardAdapter {
                 this.oms.off('order', onOrder);
                 this.oms.off('positionUpdate', onPositionUpdate);
                 this.oms.off('priceUpdate', onPriceUpdate);
+                this.oms.off('positionsSynced', onPositionsSynced);
+                this.oms.off('historyUpdate', onHistoryUpdate);
             });
         });
     }

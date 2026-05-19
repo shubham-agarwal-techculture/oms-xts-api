@@ -64,6 +64,17 @@ socket.on('priceUpdate', ({ symbol, price }) => {
     updatePnlDisplay();
 });
 
+socket.on('positionsSynced', (positions) => {
+    state.positions = positions || [];
+    renderPositions();
+});
+
+socket.on('historyUpdate', (item) => {
+    state.history.unshift(item);
+    if (state.history.length > 50) state.history.pop();
+    renderHistory();
+});
+
 // Render Functions
 function renderAll() {
     renderPositions();
@@ -102,6 +113,7 @@ function renderAlerts() {
             <div class="meta">
                 <span class="time">${new Date(alert.timestamp).toLocaleTimeString()}</span>
                 <span class="action">${alert.action} ${alert.quantity}</span>
+                ${alert.position ? `<span class="badge badge-info">${alert.position}</span>` : ''}
             </div>
             <div class="content">${alert.symbol} received from ${alert.source || 'REST'}</div>
         </div>
@@ -110,12 +122,13 @@ function renderAlerts() {
 
 function renderOrders() {
     ordersLog.innerHTML = state.orders.map(order => `
-        <div class="log-entry ${order.signal?.action?.toLowerCase()}">
+        <div class="log-entry ${((order.signal || order).action || '').toLowerCase()}">
             <div class="meta">
                 <span class="time">${new Date(order.timestamp).toLocaleTimeString()}</span>
-                <span class="badge badge-${order.status.toLowerCase()}">${order.status}</span>
+                <span class="badge badge-${(order.status || 'UNKNOWN').toLowerCase()}">${order.status || 'UNKNOWN'}</span>
+                ${(order.signal || order).position ? `<span class="badge badge-info">${(order.signal || order).position}</span>` : ''}
             </div>
-            <div class="content">${order.signal?.action} ${order.signal?.quantity} ${order.signal?.symbol} @ ${order.price || 'MKT'}</div>
+            <div class="content">${(order.signal || order).action || ''} ${(order.signal || order).quantity ?? ''} ${(order.signal || order).symbol || ''} @ ${order.price ?? 'MKT'}</div>
         </div>
     `).join('');
 }

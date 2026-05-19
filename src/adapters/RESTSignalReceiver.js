@@ -14,23 +14,28 @@ class RESTSignalReceiver extends SignalSource {
 
     setupRoutes() {
         this.app.post('/signal', (req, res) => {
-            const { symbol, action, quantity, priceType } = req.body;
+            // const { symbol, action, quantity, priceType, position } = req.body;
+            const { action, quantity, position } = req.body;
 
-            if (!symbol || !action || !quantity) {
-                return res.status(400).json({ error: 'Missing required fields: symbol, action, quantity' });
+
+            if (!position || !action || !quantity) {
+                console.warn('Invalid signal received:', req.body, req.query);
+                return res.status(400).json({
+                    error: 'Missing required fields: symbol, action, quantity, position',
+                    received: { body: req.body, query: req.query }
+                });
             }
 
-            console.log(`Received signal: ${action} ${quantity} ${symbol}`);
+            console.log(`Received signal: ${action} ${quantity} (Position: ${position || 'N/A'})`);
 
             this.events.emit('signal', {
-                symbol,
                 action: action.toUpperCase(),
                 quantity: Number(quantity),
-                priceType: priceType || 'MARKET',
+                position: position, // Pass through position if provided
                 timestamp: Date.now()
             });
 
-            res.json({ status: 'Signal received' });
+            res.json({ status: 'Signal received', action, quantity, position });
         });
     }
 

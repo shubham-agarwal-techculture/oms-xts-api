@@ -1,26 +1,44 @@
 require('dotenv').config();
 const XTSMarketDataAdapter = require('./src/adapters/XTSMarketDataAdapter');
+const PythonSidecarAdapter = require('./src/adapters/PythonSidecarAdapter');
 const RESTSignalReceiver = require('./src/adapters/RESTSignalReceiver');
 const XTSOrderExecutor = require('./src/adapters/XTSOrderExecutor');
+const MockOrderExecutor = require('./src/adapters/MockOrderExecutor');
 const DashboardAdapter = require('./src/adapters/DashboardAdapter');
 const OrderManager = require('./src/core/OrderManager');
+
+function createMarketData() {
+    if (process.env.MARKET_DATA_PROVIDER === 'python') {
+        return new PythonSidecarAdapter({
+            scriptPath: process.env.PYTHON_MARKET_DATA_SCRIPT,
+            symbol: process.env.MARKET_DATA_SYMBOL || 'btcusdt'
+        });
+    }
+    return new XTSMarketDataAdapter({
+        baseUrl: process.env.XTS_MARKET_DATA_URL,
+        appKey: process.env.XTS_APP_KEY,
+        secretKey: process.env.XTS_SECRET_KEY
+    });
+}
+
+function createOrderExecutor() {
+    if (process.env.ORDER_EXECUTOR === 'mock') {
+        console.log('Using MockOrderExecutor (no broker API calls)');
+        return new MockOrderExecutor();
+    }
+    return new XTSOrderExecutor({
+        baseUrl: process.env.XTS_INTERACTIVE_URL,
+        appKey: process.env.XTS_APP_KEY,
+        secretKey: process.env.XTS_SECRET_KEY
+    });
+}
 
 async function main() {
     try {
         // 1. Initialize Adapters
-        const marketData = new XTSMarketDataAdapter({
-            baseUrl: process.env.XTS_MARKET_DATA_URL,
-            appKey: process.env.XTS_APP_KEY,
-            secretKey: process.env.XTS_SECRET_KEY
-        });
-
+        const marketData = createMarketData();
         const signalSource = new RESTSignalReceiver(process.env.SIGNAL_PORT || 5001);
-
-        const orderExecutor = new XTSOrderExecutor({
-            baseUrl: process.env.XTS_INTERACTIVE_URL,
-            appKey: process.env.XTS_APP_KEY,
-            secretKey: process.env.XTS_SECRET_KEY
-        });
+        const orderExecutor = createOrderExecutor();
 
         // 2. Initialize Core
         const oms = new OrderManager({
@@ -34,12 +52,12 @@ async function main() {
 
         // 4. Connect and Start
         console.log('Starting OMS...');
-        
+
         await marketData.connect();
-        
+
         signalSource.start();
         dashboard.start();
-        
+
         oms.init();
 
         console.log('OMS and Dashboard are running.');

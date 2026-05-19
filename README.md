@@ -1,155 +1,334 @@
 # Order Management System (OMS)
 
-A high-performance, loosely coupled Order Management System (OMS) designed for automated trading. This system receives trade signals via a REST interface, executes orders through the XTS (X-TS) Interactive API, and provides a real-time monitoring dashboard for tracking positions, alerts, and live PnL.
+A loosely coupled Order Management System for automated trading. The OMS receives trade signals over REST, executes market orders through a broker adapter (XTS or mock), tracks positions locally, and streams live updates to a web dashboard.
 
-## 🚀 Key Features
+## Key Features
 
-- **Event-Driven Architecture**: Built on a robust event-driven core that processes signals and market data updates asynchronously.
-- **Hexagonal Architecture (Ports & Adapters)**: High level of decoupling between core business logic and external services (Brokers, Signal Sources, Market Data Providers, Dashboards).
-- **Real-time Monitoring Dashboard**: A sleek, web-based terminal to monitor open positions, signal logs, order book, and live PnL updates via WebSockets.
-- **Manual Intervention**: Capability to square off positions directly from the dashboard.
-- **Real-time Synchronization**: Subscribes to XTS Market Data WebSockets to maintain an up-to-date local order book and price cache.
-- **RESTful Signal Gateway**: Easily integrate with TradingView, Python scripts, or any webhook-capable system.
+- **Event-driven core** — Signals, market data, and order results flow through `OrderManager` as events.
+- **Ports & adapters** — Core logic is independent of broker, market data source, signal format, and dashboard.
+- **Real-time dashboard** — Web UI for positions, PnL, signal alerts, order book, and trade history via Socket.IO.
+- **Pluggable providers** — Switch between XTS market data, a Python sidecar, or mock execution without changing core code.
+- **Position-aware signals** — Signals carry a target `position` (`long`, `short`, `flat`); `flat` triggers automatic square-off.
+- **Manual square-off** — Exit positions from the dashboard or via the REST API.
+- **Broker sync** — Local positions are reconciled with the broker every 30 seconds.
 
 ---
 
-## 🏗️ System Architecture
-
-The OMS follows the **Ports and Adapters** pattern, ensuring that the core `OrderManager` remains agnostic of specific broker implementations or signal formats.
+## System Architecture
 
 ```mermaid
 graph TD
     subgraph "External Sources"
-        TV[TradingView] -->|REST| REST[REST Signal Receiver]
+        TV[TradingView / Webhook] -->|REST| REST[REST Signal Receiver]
         Algo[Custom Algo] -->|REST| REST
     end
 
     subgraph "OMS Core"
-        REST -->|Signal Event| OM[Order Manager]
-        MD[XTS Market Adapter] -->|Price Update| OM
-        OM -->|Place Order| OE[XTS Order Executor]
-        OM -->|State Updates| DASH[Dashboard Adapter]
+        REST -->|signal| OM[Order Manager]
+        MD[Market Data Adapter] -->|priceUpdate| OM
+        OM -->|placeMarketOrder| OE[Order Executor]
+        OM -->|events| DASH[Dashboard Adapter]
     end
 
-    subgraph "XTS Ecosystem"
-        OE -->|API Call| XTS_INT[XTS Interactive API]
-        XTS_MD[XTS Market Data] -->|WebSocket| MD
+    subgraph "Market Data (pick one)"
+        XTS_MD[XTS Market Data] --> MD
+        PY[Python Sidecar] --> MD
+    end
+
+    subgraph "Order Execution (pick one)"
+        OE -->|API| XTS_INT[XTS Interactive API]
+        OE -->|local| MOCK[Mock Executor]
     end
 
     subgraph "User Interface"
-        DASH -->|WebSockets| UI[Web Dashboard]
-        UI -->|Manual Square-off| DASH
+        DASH -->|WebSocket| UI[Web Dashboard]
+        UI -->|POST /api/squareoff| DASH
     end
 ```
 
+### Signal → Order flow
+
+1. A webhook hits `POST /signal` with `action`, `quantity`, and `position`.
+2. `OrderManager` resolves the symbol from the signal, the active market data provider, or a default (`GOLD26`).
+3. If `position` is `flat`, the open position for that symbol is squared off.
+4. Otherwise a market order is placed via the configured order executor.
+5. Local position state is updated and events are pushed to connected dashboard clients.
+
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```text
-oms/
-├── public/             # Dashboard Frontend (HTML/CSS/JS)
+oms-with-dummy-apis/
+├── public/                          # Dashboard frontend (HTML, CSS, JS)
+├── scratch/                         # Example signal payloads for testing
 ├── src/
-│   ├── adapters/       # Concrete implementations of interfaces
-│   │   ├── RESTSignalReceiver.js  # Express server for webhooks
-│   │   ├── XTSMarketDataAdapter.js # XTS WebSocket client
-│   │   ├── XTSOrderExecutor.js    # XTS REST client for orders
-│   │   └── DashboardAdapter.js    # Socket.io server for the UI
-│   ├── core/           # Business logic
-│   │   └── OrderManager.js        # Core coordination logic
-│   └── interfaces/     # Abstract definitions (Contracts)
+│   ├── adapters/
+│   │   ├── DashboardAdapter.js      # Express + Socket.IO server for the UI
+│   │   ├── MockOrderExecutor.js     # Logs orders locally (no broker calls)
+│   │   ├── PythonSidecarAdapter.js  # Market data via a Python subprocess
+│   │   ├── RESTSignalReceiver.js    # Webhook endpoint for trade signals
+│   │   ├── XTSMarketDataAdapter.js  # XTS WebSocket market data
+│   │   └── XTSOrderExecutor.js      # XTS REST order placement
+│   ├── core/
+│   │   └── OrderManager.js          # Core coordination and position tracking
+│   └── interfaces/                  # Abstract contracts (ports)
 │       ├── MarketDataProvider.js
 │       ├── OrderExecutor.js
 │       └── SignalSource.js
-├── .env                # Secret management
-├── index.js            # Bootstrap/Entry point
-└── package.json        # Dependencies
+├── .env                             # Local configuration (not committed)
+├── .env.example                     # Configuration template
+├── index.js                         # Bootstrap / adapter wiring
+└── package.json
 ```
 
 ---
 
-## ⚙️ Setup & Installation
+## Setup & Installation
 
 ### Prerequisites
-- Node.js (v16 or higher)
-- Active XTS API credentials (Market Data & Interactive)
 
-### 1. Clone & Install
+- Node.js v16+
+- For XTS mode: market data and interactive API credentials (or a local dummy XTS server)
+- For Python sidecar mode: Python 3 and a script that prints trade lines to stdout
+
+### Install
+
 ```bash
 git clone <repository-url>
-cd oms
+cd oms-with-dummy-apis
 npm install
 ```
 
-### 2. Configure Environment
-Create a `.env` file in the root directory:
-```env
-# XTS Credentials
-XTS_MARKET_DATA_URL="https://eztrade.wealthdiscovery.in/apimarketdata"
-XTS_INTERACTIVE_URL="https://eztrade.wealthdiscovery.in/apiinteractive"
-XTS_APP_KEY="your_app_key"
-XTS_SECRET_KEY="your_secret_key"
-XTS_SOURCE="WebAPI"
+### Configure
 
-# Port Configuration
-SIGNAL_PORT=5001
-DASHBOARD_PORT=3000
+Copy the example env file and edit values for your environment:
+
+```bash
+cp .env.example .env
 ```
 
-### 3. Run the System
+See [Environment variables](#environment-variables) for all options.
+
+### Run
+
 ```bash
 node index.js
 ```
 
----
-
-## 🖥️ OMS Dashboard
-
-Once the system is running, you can access the monitoring dashboard at:
-**`http://localhost:3000`**
-
-### Features:
-- **Live Positions**: View all open positions with real-time PnL calculation.
-- **Signal Log**: Instant notifications of incoming signals from external sources.
-- **Order Book**: Track the execution status of all orders.
-- **Square-Off**: Quick action buttons to exit positions manually if needed.
+On startup the OMS connects market data, starts the signal receiver (default port `5001`), and serves the dashboard (default port `3000`).
 
 ---
 
-## 📩 Signal API Reference
+## Quick Start (Mock Mode)
 
-### Receive Signal
-Triggers a new order placement.
+Run end-to-end without a broker or live market data:
 
-- **URL**: `/signal`
-- **Method**: `POST`
-- **Content-Type**: `application/json`
+```env
+ORDER_EXECUTOR=mock
+MARKET_DATA_PROVIDER=python
+PYTHON_MOCK_PRICE=100.50
+MARKET_DATA_SYMBOL=GOLD26
+SIGNAL_PORT=5001
+DASHBOARD_PORT=3000
+```
 
-**Body**:
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `symbol` | `string` | The instrument identifier (e.g., "1_22") |
-| `action` | `string` | "BUY" or "SELL" |
-| `quantity` | `number` | The number of units to trade |
-| `priceType`| `string` | (Optional) Default: "MARKET" |
+```bash
+node index.js
+```
 
-**Example Request**:
+Open **http://localhost:3000**, then send a test signal:
+
 ```bash
 curl -X POST http://localhost:5001/signal \
-     -H "Content-Type: application/json" \
-     -d '{"symbol": "1_22", "action": "BUY", "quantity": 1}'
+  -H "Content-Type: application/json" \
+  -d '{"action": "BUY", "quantity": 100, "position": "long"}'
+```
+
+The dashboard should update immediately — positions, order book, and alerts — without a page reload.
+
+To close the position:
+
+```bash
+curl -X POST http://localhost:5001/signal \
+  -H "Content-Type: application/json" \
+  -d '{"action": "SELL", "quantity": 100, "position": "flat"}'
+```
+
+Example payloads are also in `scratch/signal.json` and `scratch/flat_signal.json`.
+
+---
+
+## Environment Variables
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `ORDER_EXECUTOR` | *(XTS)* | Set to `mock` to use `MockOrderExecutor` (no broker API calls). |
+| `MARKET_DATA_PROVIDER` | *(XTS)* | Set to `python` to use `PythonSidecarAdapter`. |
+| `XTS_MARKET_DATA_URL` | — | XTS market data URL (`ws://…` for dummy/raw WebSocket, or HTTP base URL for standard XTS). |
+| `XTS_INTERACTIVE_URL` | — | XTS interactive API base URL (e.g. `http://127.0.0.1:8001`). |
+| `XTS_APP_KEY` | — | XTS application key. |
+| `XTS_SECRET_KEY` | — | XTS secret key. |
+| `PYTHON_MARKET_DATA_SCRIPT` | — | Path to Python script when using the sidecar adapter. |
+| `MARKET_DATA_SYMBOL` | `btcusdt` | Active symbol for Python sidecar / symbol resolution. |
+| `PYTHON_MOCK_PRICE` | — | If set, skips the Python subprocess and uses this fixed price. |
+| `SIGNAL_PORT` | `5001` | Port for the REST signal webhook. |
+| `DASHBOARD_PORT` | `3000` | Port for the web dashboard. |
+
+---
+
+## Local Development with Dummy XTS API
+
+When pointing at a local dummy XTS server (e.g. `http://127.0.0.1:8001`), the order executor uses:
+
+| Operation | Method | Path |
+| :--- | :--- | :--- |
+| Place order | `POST` | `/interactive/orders` |
+| Get positions | `GET` | `/portfolio/positions` |
+| Square off | `POST` | `/interactive/positions/squareoff` |
+
+Symbol format for XTS orders is `{exchangeSegment}_{exchangeInstrumentId}` (e.g. `1_22`). If no underscore is present, segment `1` is assumed.
+
+---
+
+## Signal API
+
+Receives trade intent and triggers order placement or square-off.
+
+- **URL:** `http://localhost:5001/signal`
+- **Method:** `POST`
+- **Content-Type:** `application/json`
+
+### Request body
+
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `action` | `string` | Yes | `BUY` or `SELL` (case-insensitive). |
+| `quantity` | `number` | Yes | Number of units to trade. |
+| `position` | `string` | Yes | Target position: `long`, `short`, or `flat`. |
+| `symbol` | `string` | No | Instrument identifier. If omitted, resolved from the market data provider's active symbol, then falls back to `GOLD26`. |
+
+### Behaviour
+
+- **`position: "flat"`** — Squares off the full open position for the resolved symbol. No new order is placed unless a position exists.
+- **Other positions** — Places a market order for `action` / `quantity` and updates local position tracking.
+
+### Examples
+
+Open a long position:
+
+```bash
+curl -X POST http://localhost:5001/signal \
+  -H "Content-Type: application/json" \
+  -d '{"action": "BUY", "quantity": 100, "position": "long"}'
+```
+
+Square off:
+
+```bash
+curl -X POST http://localhost:5001/signal \
+  -H "Content-Type: application/json" \
+  -d '{"action": "SELL", "quantity": 100, "position": "flat"}'
+```
+
+With an explicit symbol:
+
+```bash
+curl -X POST http://localhost:5001/signal \
+  -H "Content-Type: application/json" \
+  -d '{"symbol": "1_22", "action": "BUY", "quantity": 1, "position": "long"}'
+```
+
+### Response
+
+**200 OK**
+
+```json
+{ "status": "Signal received", "action": "BUY", "quantity": 100, "position": "long" }
+```
+
+**400 Bad Request** — missing required fields.
+
+---
+
+## Dashboard
+
+**URL:** http://localhost:3000
+
+### Panels
+
+| Panel | Description |
+| :--- | :--- |
+| Open Positions | Live qty, average price, LTP, and PnL per symbol |
+| Signal Alerts | Incoming webhook signals |
+| Order Book | Placed, failed, and squared-off orders |
+| Trade History | Closed positions with entry/exit prices and realised PnL |
+
+Header stats show connection status, active position count, and total unrealised PnL.
+
+### REST endpoints
+
+| Method | Path | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/state` | Full snapshot (positions, orders, alerts, history) |
+| `POST` | `/api/squareoff/:symbol` | Manually square off a symbol |
+
+### WebSocket events (Socket.IO)
+
+Clients connect and receive an initial `state` event, then incremental updates:
+
+| Event | Payload | Description |
+| :--- | :--- | :--- |
+| `state` | `{ positions, orders, alerts, historicalPositions }` | Full state on connect |
+| `alert` | signal object | New incoming signal |
+| `order` | order object | Order placed, failed, or squared off |
+| `positionUpdate` | `{ symbol, qty, avgPrice }` | Single position changed |
+| `priceUpdate` | `{ symbol, price }` | Market price tick |
+| `historyUpdate` | closed trade object | Position closed |
+| `positionsSynced` | position array | Broker reconciliation (every 30s) |
+
+---
+
+## Python Sidecar Market Data
+
+When `MARKET_DATA_PROVIDER=python`, Node spawns a Python script and parses stdout for trade lines:
+
+```text
+TRADE | buy | price=3124.50 | vol=0.0450 | ...
+```
+
+Configure the script path and symbol:
+
+```env
+MARKET_DATA_PROVIDER=python
+PYTHON_MARKET_DATA_SCRIPT=/path/to/your/market_data.py
+MARKET_DATA_SYMBOL=btcusdt
+```
+
+For development without a live feed, set a fixed price instead:
+
+```env
+PYTHON_MOCK_PRICE=100.50
 ```
 
 ---
 
-## 🛠️ Extending the System
+## Extending the System
 
-The system is designed for extensibility. To add a new broker:
-1.  Create a new adapter in `src/adapters/` (e.g., `ZerodhaOrderExecutor.js`).
-2.  Inherit from the relevant interface in `src/interfaces/`.
-3.  Swap the implementation in `index.js`.
+The core depends only on interfaces in `src/interfaces/`. To add a new integration:
+
+1. Create an adapter in `src/adapters/` implementing the relevant interface.
+2. Wire it in `index.js` (follow the `createMarketData()` / `createOrderExecutor()` pattern).
+3. Optionally add an env flag to select it at runtime.
+
+Examples already in the repo:
+
+- **New broker** — implement `OrderExecutor` (see `XTSOrderExecutor`, `MockOrderExecutor`).
+- **New signal source** — implement `SignalSource` (see `RESTSignalReceiver`).
+- **New market data feed** — implement `MarketDataProvider` (see `XTSMarketDataAdapter`, `PythonSidecarAdapter`).
 
 ---
 
-## 📝 License
+## License
+
 Proprietary / Internal Use

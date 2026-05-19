@@ -1,5 +1,14 @@
 # Order Management System
 
-it has a simple use - create a market order from the details and send it to the exchange  - it just get the price data from websocket stream and signal intent data from some other source.
+A loosely coupled OMS that receives trade signals over REST, resolves market prices from a pluggable feed, places market orders through a broker adapter, and streams live state to a web dashboard.
 
-It should have a proper interfaces for all integrations i.e. system should be loosely coupled.
+## Integrations (ports)
+
+| Port | Default adapter | Alternatives |
+| :--- | :--- | :--- |
+| Signal source | `RESTSignalReceiver` | Implement `SignalSource` |
+| Market data | `XTSMarketDataAdapter` | `PythonSidecarAdapter` |
+| Order execution | `XTSOrderExecutor` | `MockOrderExecutor` |
+| Dashboard | `DashboardAdapter` | Any consumer of OMS events |
+
+See [README.md](./README.md) for setup, signal API, and configuration.

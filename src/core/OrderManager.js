@@ -20,9 +20,18 @@ class OrderManager extends EventEmitter {
 
     init() {
         console.log('Initializing Order Manager...');
-        
+
         // Listen for signals
         this.signalSource.on('signal', async (signal) => {
+            // Resolve symbol if missing
+            if (!signal.symbol && typeof this.marketData.getActiveSymbol === 'function') {
+                signal.symbol = this.marketData.getActiveSymbol();
+            }
+            if (!signal.symbol) {
+                signal.symbol = 'GOLD26';
+            }
+            console.log(`Resolved symbol ${signal.symbol} for signal processing`);
+            
             this.alerts.push({ ...signal, timestamp: Date.now() });
             this.emit('alert', signal);
             await this.handleSignal(signal);
@@ -32,13 +41,57 @@ class OrderManager extends EventEmitter {
         this.marketData.on('priceUpdate', ({ symbol, price }) => {
             this.emit('priceUpdate', { symbol, price });
         });
+
+        // Periodic position sync (Optional but good for dummy APIs)
+        setInterval(() => this.syncPositions(), 30000); // every 30s
+    }
+
+    async syncPositions() {
+        try {
+            const response = await this.orderExecutor.getPositions();
+            console.log('Synced positions from API');
+
+            if (response && response.result && Array.isArray(response.result.positionList)) {
+                // Update local positions map based on API data
+                // This ensures the dashboard shows what the broker/dummy API sees
+                response.result.positionList.forEach(pos => {
+                    const symbol = `${pos.ExchangeSegment}_${pos.ExchangeInstrumentId}`;
+                    this.positions.set(symbol, {
+                        qty: Number(pos.NetQty),
+                        avgPrice: Number(pos.NetPrice),
+                        totalCost: Number(pos.NetQty) * Number(pos.NetPrice)
+                    });
+                });
+                this.emit('positionsSynced', this.getAllPositions());
+            }
+        } catch (error) {
+            console.error('Failed to sync positions:', error.message);
+        }
     }
 
     async handleSignal(signal) {
-        const { symbol, action, quantity } = signal;
-        
+        const { symbol, action, quantity, position } = signal;
+
         const currentPrice = this.marketData.getLastPrice(symbol);
-        console.log(`Processing signal: ${action} ${quantity} ${symbol}. Last Price: ${currentPrice || 'N/A'}`);
+        console.log(`Processing signal for ${symbol}: Action=${action}, Qty=${quantity}, TargetPos=${position || 'N/A'}. Last Price: ${currentPrice || 'N/A'}`);
+
+        // Handle target position 'flat' as a square-off signal
+        if (position === 'flat') {
+            console.log(`Signal indicates 'flat' position. Squaring off ${symbol}...`);
+            try {
+                const result = await this.squareOff(symbol);
+                this.emit('order', {
+                    signal,
+                    result,
+                    status: 'SQUARED_OFF',
+                    timestamp: Date.now()
+                });
+                this.emit('positionUpdate', this.getPosition(symbol));
+                return;
+            } catch (error) {
+                console.error(`Automatic square-off failed for ${symbol}:`, error.message);
+            }
+        }
 
         try {
             const result = await this.orderExecutor.placeMarketOrder({
@@ -48,12 +101,16 @@ class OrderManager extends EventEmitter {
             });
 
             console.log(`Order Placed Successfully:`, JSON.stringify(result));
-            
+
             const orderEntry = {
                 id: result?.result?.AppOrderID || `ORD_${Date.now()}`,
+                symbol,
+                action,
+                quantity,
+                marketPrice: currentPrice ?? null,
                 signal,
                 result,
-                price: currentPrice || 0, // Using last known price as execution price for tracking
+                price: currentPrice || 0,
                 timestamp: Date.now(),
                 status: 'PLACED'
             };
@@ -62,6 +119,18 @@ class OrderManager extends EventEmitter {
             this.updatePosition(symbol, action, quantity, orderEntry.price);
             this.emit('order', orderEntry);
             this.emit('positionUpdate', this.getPosition(symbol));
+
+            console.log('=== ORDER CREATED ===');
+            console.log(JSON.stringify({
+                id: orderEntry.id,
+                symbol: orderEntry.symbol,
+                action: orderEntry.action,
+                quantity: orderEntry.quantity,
+                marketPrice: orderEntry.marketPrice,
+                trackingPrice: orderEntry.price,
+                status: orderEntry.status,
+                timestamp: orderEntry.timestamp
+            }, null, 2));
 
         } catch (error) {
             console.error(`Order Placement Failed for ${symbol}:`, error.message);
@@ -79,20 +148,22 @@ class OrderManager extends EventEmitter {
     updatePosition(symbol, action, quantity, price) {
         let pos = this.positions.get(symbol) || { qty: 0, avgPrice: 0, totalCost: 0 };
         const tradeQty = action === 'BUY' ? quantity : -quantity;
-        
+
         const oldQty = pos.qty;
         const newQty = oldQty + tradeQty;
 
         if (newQty === 0) {
             // Position closed
-            this.historicalPositions.push({
+            const closed = {
                 symbol,
                 entryPrice: pos.avgPrice,
                 exitPrice: price,
                 qty: Math.abs(oldQty),
                 pnl: (price - pos.avgPrice) * oldQty,
                 timestamp: Date.now()
-            });
+            };
+            this.historicalPositions.push(closed);
+            this.emit('historyUpdate', closed);
             this.positions.delete(symbol);
         } else {
             // Update position
@@ -112,7 +183,8 @@ class OrderManager extends EventEmitter {
     }
 
     getPosition(symbol) {
-        return this.positions.get(symbol) || { qty: 0, avgPrice: 0 };
+        const data = this.positions.get(symbol) || { qty: 0, avgPrice: 0 };
+        return { symbol, ...data };
     }
 
     getAllPositions() {
@@ -126,11 +198,24 @@ class OrderManager extends EventEmitter {
         const pos = this.positions.get(symbol);
         if (!pos || pos.qty === 0) return { error: 'No open position' };
 
-        const action = pos.qty > 0 ? 'SELL' : 'BUY';
         const quantity = Math.abs(pos.qty);
 
-        console.log(`Manual Square-off triggered for ${symbol}: ${action} ${quantity}`);
-        return await this.handleSignal({ symbol, action, quantity, source: 'MANUAL_SQUAREOFF' });
+        console.log(`Manual Square-off triggered for ${symbol}: Qty ${quantity}`);
+
+        try {
+            const result = await this.orderExecutor.squareOffPosition({ symbol, quantity });
+            console.log(`Square-off result for ${symbol}:`, JSON.stringify(result));
+
+            // Still update local position tracking
+            const action = pos.qty > 0 ? 'SELL' : 'BUY';
+            this.updatePosition(symbol, action, quantity, this.marketData.getLastPrice(symbol) || 0);
+            this.emit('positionUpdate', this.getPosition(symbol));
+
+            return result;
+        } catch (error) {
+            console.error(`Square-off failed for ${symbol}:`, error.message);
+            throw error;
+        }
     }
 
     getState() {
