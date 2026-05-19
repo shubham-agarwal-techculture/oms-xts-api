@@ -11,6 +11,7 @@ A loosely coupled Order Management System for automated trading. The OMS receive
 - **Position-aware signals** — Signals carry a target `position` (`long`, `short`, `flat`); `flat` triggers automatic square-off.
 - **Manual square-off** — Exit positions from the dashboard or via the REST API.
 - **Broker sync** — Local positions are reconciled with the broker every 30 seconds.
+- **Durable state** — Orders, alerts, open positions, and trade history are saved to disk and restored on restart.
 
 ---
 
@@ -49,7 +50,7 @@ graph TD
 ### Signal → Order flow
 
 1. A webhook hits `POST /signal` with `action`, `quantity`, and `position`.
-2. `OrderManager` resolves the symbol from the signal, the active market data provider, or a default (`GOLD26`).
+2. `OrderManager` resolves the symbol from the signal, the active market data provider, or `DEFAULT_SYMBOL` (default `1_22`).
 3. If `position` is `flat`, the open position for that symbol is squared off.
 4. Otherwise a market order is placed via the configured order executor.
 5. Local position state is updated and events are pushed to connected dashboard clients.
@@ -61,7 +62,7 @@ graph TD
 ```text
 oms-with-dummy-apis/
 ├── public/                          # Dashboard frontend (HTML, CSS, JS)
-├── scratch/                         # Example signal payloads for testing
+├── data/                            # Created at runtime; oms-state.json is gitignored
 ├── src/
 │   ├── adapters/
 │   │   ├── DashboardAdapter.js      # Express + Socket.IO server for the UI
@@ -71,7 +72,8 @@ oms-with-dummy-apis/
 │   │   ├── XTSMarketDataAdapter.js  # XTS WebSocket market data
 │   │   └── XTSOrderExecutor.js      # XTS REST order placement
 │   ├── core/
-│   │   └── OrderManager.js          # Core coordination and position tracking
+│   │   ├── OrderManager.js          # Core coordination and position tracking
+│   │   └── OmsStateStore.js         # JSON file persistence for OMS state
 │   └── interfaces/                  # Abstract contracts (ports)
 │       ├── MarketDataProvider.js
 │       ├── OrderExecutor.js
@@ -172,8 +174,29 @@ Example payloads are also in `scratch/signal.json` and `scratch/flat_signal.json
 | `PYTHON_MARKET_DATA_SCRIPT` | — | Path to Python script when using the sidecar adapter. |
 | `MARKET_DATA_SYMBOL` | `btcusdt` | Active symbol for Python sidecar / symbol resolution. |
 | `PYTHON_MOCK_PRICE` | — | If set, skips the Python subprocess and uses this fixed price. |
+| `DEFAULT_SYMBOL` | `1_22` | Default instrument when the signal omits `symbol`. |
 | `SIGNAL_PORT` | `5001` | Port for the REST signal webhook. |
 | `DASHBOARD_PORT` | `3000` | Port for the web dashboard. |
+| `OMS_STATE_PATH` | `<cwd>/data/oms-state.json` | Path to the persisted state file. |
+| `OMS_MAX_STATE_ITEMS` | `5000` | Max entries kept per list (orders, alerts, history) when saving. |
+| `OMS_UI_STATE_WINDOW` | `500` | How many recent orders/alerts/history rows the dashboard snapshot includes. |
+| `OMS_PERSIST_DEBOUNCE_MS` | `400` | Debounce window for batched disk writes. |
+| `OMS_DISABLE_PERSIST` | — | Set to `1` to disable loading/saving state (in-memory only). |
+
+---
+
+## Persistence
+
+The OMS writes a single JSON snapshot (`data/oms-state.json` by default) containing:
+
+- **orders** — Placed, failed, and squared-off order records  
+- **alerts** — Signal log entries  
+- **positions** — Local open position map (symbol → qty, average price, metadata)  
+- **historicalPositions** — Closed trades for the history panel  
+
+On **`OrderManager.init()`**, that file is loaded if it exists. After signals, order outcomes, position updates, broker sync merges, and square-offs, state is saved again (debounced writes; synchronous flush on `SIGINT` / `SIGTERM`).
+
+The default state path is gitignored. For production, set **`OMS_STATE_PATH`** to a persistent volume path.
 
 ---
 

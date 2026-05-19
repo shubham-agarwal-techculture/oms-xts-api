@@ -1,5 +1,8 @@
 const socket = io();
 
+/** Keep in sync with server `OMS_UI_STATE_WINDOW` default (500). */
+const MAX_UI_ITEMS = 500;
+
 const state = {
     positions: [],
     alerts: [],
@@ -38,13 +41,13 @@ socket.on('state', (data) => {
 
 socket.on('alert', (alert) => {
     state.alerts.unshift(alert);
-    if (state.alerts.length > 50) state.alerts.pop();
+    if (state.alerts.length > MAX_UI_ITEMS) state.alerts.pop();
     renderAlerts();
 });
 
 socket.on('order', (order) => {
     state.orders.unshift(order);
-    if (state.orders.length > 50) state.orders.pop();
+    if (state.orders.length > MAX_UI_ITEMS) state.orders.pop();
     renderOrders();
 });
 
@@ -71,7 +74,7 @@ socket.on('positionsSynced', (positions) => {
 
 socket.on('historyUpdate', (item) => {
     state.history.unshift(item);
-    if (state.history.length > 50) state.history.pop();
+    if (state.history.length > MAX_UI_ITEMS) state.history.pop();
     renderHistory();
 });
 
@@ -83,19 +86,44 @@ function renderAll() {
     renderHistory();
 }
 
+function formatPrice(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) return '—';
+    return n.toFixed(2);
+}
+
+function positionPnl(pos, ltp) {
+    const avg = Number(pos.avgPrice);
+    const last = Number(ltp);
+    if (!Number.isFinite(avg) || avg <= 0 || !Number.isFinite(last) || last <= 0) {
+        return null;
+    }
+    return (last - avg) * pos.qty;
+}
+
 function renderPositions() {
     positionsBody.innerHTML = state.positions.map(pos => {
-        const ltp = state.prices[pos.symbol] || pos.avgPrice;
-        const pnl = (ltp - pos.avgPrice) * pos.qty;
-        const pnlClass = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
-        
+        const ltp = state.prices[pos.symbol];
+        const hasLtp = Number.isFinite(ltp) && ltp > 0;
+        const ltpDisplay = hasLtp ? ltp : (Number(pos.avgPrice) > 0 ? pos.avgPrice : null);
+        const pnl = positionPnl(pos, hasLtp ? ltp : null);
+        const pnlClass = pnl == null ? '' : pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+        const pnlText = pnl == null ? '—' : `₹${pnl.toFixed(2)}`;
+        const side = pos.side || (pos.qty > 0 ? 'LONG' : pos.qty < 0 ? 'SHORT' : 'FLAT');
+        const positionQty = Math.abs(pos.qty);
+        const orderQty = pos.lastOrderQty != null ? pos.lastOrderQty : '—';
+        const targetQty = pos.targetQty != null ? Math.abs(pos.targetQty) : '—';
+
         return `
             <tr>
                 <td><strong>${pos.symbol}</strong></td>
-                <td>${pos.qty}</td>
-                <td>${pos.avgPrice.toFixed(2)}</td>
-                <td id="ltp-${pos.symbol}">${ltp.toFixed(2)}</td>
-                <td class="${pnlClass}" id="pnl-${pos.symbol}">₹${pnl.toFixed(2)}</td>
+                <td><span class="badge badge-${side.toLowerCase()}">${side}</span></td>
+                <td class="qty-position">${positionQty}</td>
+                <td class="qty-order">${orderQty}</td>
+                <td class="qty-target">${targetQty}</td>
+                <td>${formatPrice(pos.avgPrice)}</td>
+                <td id="ltp-${pos.symbol}">${ltpDisplay != null ? ltpDisplay.toFixed(2) : '—'}</td>
+                <td class="${pnlClass}" id="pnl-${pos.symbol}">${pnlText}</td>
                 <td>
                     <button class="btn-squareoff" onclick="squareOff('${pos.symbol}')">Square Off</button>
                 </td>
@@ -112,10 +140,11 @@ function renderAlerts() {
         <div class="log-entry">
             <div class="meta">
                 <span class="time">${new Date(alert.timestamp).toLocaleTimeString()}</span>
-                <span class="action">${alert.action} ${alert.quantity}</span>
+                <span class="action">${alert.action}</span>
+                <span class="qty-label">Signal Qty: ${alert.quantity}</span>
                 ${alert.position ? `<span class="badge badge-info">${alert.position}</span>` : ''}
             </div>
-            <div class="content">${alert.symbol} received from ${alert.source || 'REST'}</div>
+            <div class="content">${alert.symbol || '—'} · target ${alert.position || '—'} position</div>
         </div>
     `).join('');
 }
@@ -128,7 +157,13 @@ function renderOrders() {
                 <span class="badge badge-${(order.status || 'UNKNOWN').toLowerCase()}">${order.status || 'UNKNOWN'}</span>
                 ${(order.signal || order).position ? `<span class="badge badge-info">${(order.signal || order).position}</span>` : ''}
             </div>
-            <div class="content">${(order.signal || order).action || ''} ${(order.signal || order).quantity ?? ''} ${(order.signal || order).symbol || ''} @ ${order.price ?? 'MKT'}</div>
+            <div class="content">
+                ${(order.signal || order).symbol || order.symbol || '—'} ·
+                ${order.action || (order.signal || order).action || ''}
+                · Order Qty: ${order.orderQty ?? order.quantity ?? '—'}
+                · Position Qty: ${order.positionQty != null ? Math.abs(order.positionQty) : '—'}
+                @ ${order.price ?? 'MKT'}
+            </div>
         </div>
     `).join('');
 }
@@ -147,23 +182,36 @@ function renderHistory() {
 
 function updatePnlDisplay() {
     let totalPnl = 0;
+    let hasAnyPnl = false;
     state.positions.forEach(pos => {
-        const ltp = state.prices[pos.symbol] || pos.avgPrice;
-        const pnl = (ltp - pos.avgPrice) * pos.qty;
-        totalPnl += pnl;
-        
-        // Live update individual rows if they exist
+        const ltp = state.prices[pos.symbol];
+        const hasLtp = Number.isFinite(ltp) && ltp > 0;
+        const pnl = positionPnl(pos, hasLtp ? ltp : null);
+        if (pnl != null) {
+            totalPnl += pnl;
+            hasAnyPnl = true;
+        }
+
         const ltpEl = document.getElementById(`ltp-${pos.symbol}`);
         const pnlEl = document.getElementById(`pnl-${pos.symbol}`);
-        if (ltpEl) ltpEl.textContent = ltp.toFixed(2);
+        if (ltpEl) {
+            ltpEl.textContent = hasLtp
+                ? ltp.toFixed(2)
+                : (Number(pos.avgPrice) > 0 ? Number(pos.avgPrice).toFixed(2) : '—');
+        }
         if (pnlEl) {
-            pnlEl.textContent = `₹${pnl.toFixed(2)}`;
-            pnlEl.className = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+            if (pnl == null) {
+                pnlEl.textContent = '—';
+                pnlEl.className = '';
+            } else {
+                pnlEl.textContent = `₹${pnl.toFixed(2)}`;
+                pnlEl.className = pnl >= 0 ? 'pnl-positive' : 'pnl-negative';
+            }
         }
     });
-    
-    totalPnlEl.textContent = `₹${totalPnl.toFixed(2)}`;
-    totalPnlEl.className = `value ${totalPnl >= 0 ? 'pnl-positive' : 'pnl-negative'}`;
+
+    totalPnlEl.textContent = hasAnyPnl ? `₹${totalPnl.toFixed(2)}` : '—';
+    totalPnlEl.className = `value ${hasAnyPnl ? (totalPnl >= 0 ? 'pnl-positive' : 'pnl-negative') : ''}`;
 }
 
 async function squareOff(symbol) {

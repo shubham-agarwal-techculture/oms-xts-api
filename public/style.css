@@ -224,3 +224,11 @@ td {
 .badge-failed { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
 .badge-info { background: rgba(245, 158, 11, 0.2); color: var(--accent-orange); }
 .badge-squared_off { background: rgba(146, 153, 166, 0.2); color: var(--text-secondary); }
+.badge-long { background: rgba(16, 185, 129, 0.2); color: var(--accent-green); }
+.badge-short { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+.badge-flat { background: rgba(146, 153, 166, 0.2); color: var(--text-secondary); }
+
+.qty-position { font-weight: 600; color: var(--text-primary); }
+.qty-order { color: var(--accent-blue); font-weight: 500; }
+.qty-target { color: var(--accent-orange); font-weight: 500; }
+.qty-label { color: var(--accent-blue); font-weight: 500; margin-left: 8px; }

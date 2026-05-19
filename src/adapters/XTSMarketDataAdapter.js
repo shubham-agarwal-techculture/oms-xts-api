@@ -117,8 +117,13 @@ class XTSMarketDataAdapter extends MarketDataProvider {
         // console.debug('Market data received:', JSON.stringify(parsed));
         // Handle XTS format: parsed.Touchline.LastTradedPrice
         // or a flatter dummy format: parsed.LastTradedPrice
+        const defaultSymbol = process.env.DEFAULT_SYMBOL || '1_22';
         const isDummy = this.config.baseUrl.startsWith('ws://') || this.config.baseUrl.startsWith('wss://');
-        const symbol = isDummy ? 'GOLD26' : (parsed.symbol || (parsed.ExchangeSegment && parsed.ExchangeInstrumentID ? `${parsed.ExchangeSegment}_${parsed.ExchangeInstrumentID}` : 'GOLD26'));
+        const symbol = isDummy
+            ? defaultSymbol
+            : (parsed.symbol || (parsed.ExchangeSegment && parsed.ExchangeInstrumentID
+                ? `${parsed.ExchangeSegment}_${parsed.ExchangeInstrumentID}`
+                : defaultSymbol));
         const price = parsed.price || parsed.Touchline?.LastTradedPrice || parsed.LastTradedPrice || parsed.close || parsed.last;
         
         if (price) {
@@ -146,7 +151,17 @@ class XTSMarketDataAdapter extends MarketDataProvider {
 
     getLastPrice(symbol) {
         const targetSymbol = symbol || this.lastSymbol;
-        return targetSymbol ? this.lastPrices.get(targetSymbol) : null;
+        if (targetSymbol) {
+            const direct = this.lastPrices.get(targetSymbol);
+            if (Number.isFinite(direct) && direct > 0) return direct;
+        }
+        if (this.lastPrices.size > 0) {
+            for (const v of this.lastPrices.values()) {
+                const n = Number(v);
+                if (Number.isFinite(n) && n > 0) return n;
+            }
+        }
+        return null;
     }
 
     getActiveSymbol() {

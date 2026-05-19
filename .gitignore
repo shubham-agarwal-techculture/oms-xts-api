@@ -1,8 +1,8 @@
-.env
+data/oms-state.json
 
-node_modules/
 
 implementation*.md
+node_modules/
 
 .claude
 
@@ -11,3 +11,6 @@ implementation*.md
 .
 *.claude
 .claude
+
+.env
+
