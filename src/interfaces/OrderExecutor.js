@@ -10,15 +10,27 @@ class OrderExecutor {
     }
 
     /**
-     * Place a market order.
+     * Place an order (market, limit, cover, etc.).
      * @param {Object} orderDetails 
      * @param {string} orderDetails.symbol
      * @param {string} orderDetails.action (BUY/SELL)
      * @param {number} orderDetails.quantity
+     * @param {string} [orderDetails.orderType] (MARKET/LIMIT/COVER) - default: LIMIT
+     * @param {number} [orderDetails.limitPrice] - required for LIMIT orders
+     * @param {string} [orderDetails.productType] (MIS/NRML/CNC) - default: MIS
+     * @param {string} [orderDetails.instrumentType] (EQUITY/OPTIONS/FUTURES/COMMODITY)
      * @returns {Promise<Object>} The result of order placement.
      */
+    async placeOrder(orderDetails) {
+        throw new Error("Method 'placeOrder()' must be implemented");
+    }
+
+    /**
+     * @deprecated Use placeOrder() instead
+     * Place a market order (backward compatibility).
+     */
     async placeMarketOrder(orderDetails) {
-        throw new Error("Method 'placeMarketOrder()' must be implemented");
+        return this.placeOrder({ ...orderDetails, orderType: 'MARKET' });
     }
 
     /**

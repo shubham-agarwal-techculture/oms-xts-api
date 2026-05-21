@@ -1,6 +1,6 @@
 # Order Management System (OMS)
 
-A loosely coupled Order Management System for automated trading. The OMS receives trade signals over REST, executes market orders through a broker adapter (XTS or mock), tracks positions locally, and streams live updates to a web dashboard.
+A loosely coupled Order Management System for automated trading. The OMS receives trade signals over REST, executes orders (market, limit, cover) through a broker adapter (XTS or mock), tracks positions locally, and streams live updates to a web dashboard.
 
 ## Key Features
 
@@ -8,6 +8,7 @@ A loosely coupled Order Management System for automated trading. The OMS receive
 - **Ports & adapters** — Core logic is independent of broker, market data source, signal format, and dashboard.
 - **Real-time dashboard** — Web UI for positions, PnL, signal alerts, order book, and trade history via Socket.IO.
 - **Pluggable providers** — Switch between XTS market data, a Python sidecar, or mock execution without changing core code.
+- **Multiple order types** — Supports MARKET, LIMIT, and COVER orders with flexible parameters.
 - **Position-aware signals** — Signals carry a target `position` (`long`, `short`, `flat`); `flat` triggers automatic square-off.
 - **Manual square-off** — Exit positions from the dashboard or via the REST API.
 - **Broker sync** — Local positions are reconciled with the broker every 30 seconds.
@@ -27,7 +28,7 @@ graph TD
     subgraph "OMS Core"
         REST -->|signal| OM[Order Manager]
         MD[Market Data Adapter] -->|priceUpdate| OM
-        OM -->|placeMarketOrder| OE[Order Executor]
+        OM -->|placeOrder MARKET/LIMIT/COVER | OE[Order Executor]
         OM -->|events| DASH[Dashboard Adapter]
     end
 
@@ -49,10 +50,10 @@ graph TD
 
 ### Signal → Order flow
 
-1. A webhook hits `POST /signal` with `action`, `quantity`, and `position`.
+1. A webhook hits `POST /signal` with `action`, `quantity`, and `position` (and optional `orderType`, `limitPrice`, `productType`, `instrumentType`).
 2. `OrderManager` resolves the symbol from the signal, the active market data provider, or `DEFAULT_SYMBOL` (default `1_22`).
 3. If `position` is `flat`, the open position for that symbol is squared off.
-4. Otherwise a market order is placed via the configured order executor.
+4. Otherwise an order (default LIMIT) is placed via the configured order executor — if no limit price is provided, it uses the current market price.
 5. Local position state is updated and events are pushed to connected dashboard clients.
 
 ---
@@ -60,7 +61,7 @@ graph TD
 ## Project Structure
 
 ```text
-oms-with-dummy-apis/
+oms-with-xts-api/
 ├── public/                          # Dashboard frontend (HTML, CSS, JS)
 ├── data/                            # Created at runtime; oms-state.json is gitignored
 ├── src/
@@ -98,7 +99,7 @@ oms-with-dummy-apis/
 
 ```bash
 git clone <repository-url>
-cd oms-with-dummy-apis
+cd oms-with-xts-api
 npm install
 ```
 
@@ -233,12 +234,17 @@ Receives trade intent and triggers order placement or square-off.
 | `action` | `string` | Yes | `BUY` or `SELL` (case-insensitive). |
 | `quantity` | `number` | Yes | Number of units to trade. |
 | `position` | `string` | Yes | Target position: `long`, `short`, or `flat`. |
-| `symbol` | `string` | No | Instrument identifier. If omitted, resolved from the market data provider's active symbol, then falls back to `GOLD26`. |
+| `symbol` | `string` | No | Instrument identifier. If omitted, resolved from the market data provider's active symbol, then falls back to `1_22`. |
+| `orderType` | `string` | No | Order type: `MARKET`, `LIMIT`, or `COVER` — default: `LIMIT`. |
+| `limitPrice` | `number` | No | Limit price (required for LIMIT orders if no current market price is available). |
+| `stopLossPrice` | `number` | No | Stop loss price (for COVER orders). |
+| `productType` | `string` | No | Product type: `MIS`, `NRML`, or `CNC` — default: `MIS`. |
+| `instrumentType` | `string` | No | Instrument type: `EQUITY`, `OPTIONS`, `FUTURES`, `COMMODITY`.
 
 ### Behaviour
 
 - **`position: "flat"`** — Squares off the full open position for the resolved symbol. No new order is placed unless a position exists.
-- **Other positions** — Places a market order for `action` / `quantity` and updates local position tracking.
+- **Other positions** — Places an order (default LIMIT) for `action` / `quantity` and updates local position tracking.
 
 ### Examples
 

@@ -5,7 +5,7 @@ const OrderExecutor = require('../interfaces/OrderExecutor');
  * Use ORDER_EXECUTOR=mock for end-to-end verification.
  */
 class MockOrderExecutor extends OrderExecutor {
-    async placeMarketOrder(orderDetails) {
+    async placeOrder(orderDetails) {
         const result = {
             type: 'success',
             result: {
@@ -13,7 +13,7 @@ class MockOrderExecutor extends OrderExecutor {
                 ...orderDetails
             }
         };
-        console.log('[MockOrderExecutor] placeMarketOrder:', JSON.stringify(orderDetails));
+        console.log('[MockOrderExecutor] placeOrder:', JSON.stringify(orderDetails));
         return result;
     }
 

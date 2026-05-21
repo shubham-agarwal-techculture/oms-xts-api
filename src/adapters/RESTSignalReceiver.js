@@ -26,11 +26,16 @@ class RESTSignalReceiver extends SignalSource {
 
             console.log(`Received signal: ${action} ${quantity} for ${symbol || 'default'} (Position: ${position || 'N/A'})`);
 
+            const { orderType, limitPrice, productType, instrumentType } = req.body;
             this.events.emit('signal', {
                 symbol: symbol,
                 action: action.toUpperCase(),
                 quantity: Number(quantity),
-                position: position, // Pass through position if provided
+                position: position,
+                orderType: (orderType || 'LIMIT').toUpperCase(),
+                limitPrice: limitPrice ? Number(limitPrice) : undefined,
+                productType: (productType || 'MIS').toUpperCase(),
+                instrumentType: instrumentType ? instrumentType.toUpperCase() : undefined,
                 timestamp: Date.now()
             });
 

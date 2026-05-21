@@ -350,10 +350,17 @@ class OrderManager extends EventEmitter {
         const orderQty = Math.abs(delta);
 
         try {
-            const result = await this.orderExecutor.placeMarketOrder({
+            // Use current market price as limit price if not provided for LIMIT orders
+            const resolvedLimitPrice = signal.limitPrice || currentPrice;
+            
+            const result = await this.orderExecutor.placeOrder({
                 symbol,
                 action,
-                quantity: orderQty
+                quantity: orderQty,
+                orderType: signal.orderType || 'LIMIT',
+                limitPrice: resolvedLimitPrice,
+                productType: signal.productType || 'MIS',
+                instrumentType: signal.instrumentType
             });
 
             console.log(`Order Placed Successfully:`, JSON.stringify(result));

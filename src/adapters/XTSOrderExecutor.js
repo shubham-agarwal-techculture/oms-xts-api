@@ -31,7 +31,7 @@ class XTSOrderExecutor extends OrderExecutor {
         console.log('Interactive Login successful');
     }
 
-    async placeMarketOrder(orderDetails) {
+    async placeOrder(orderDetails) {
         if (!this.token) await this.login();
 
         let exchangeSegment, exchangeInstrumentID;
@@ -45,15 +45,16 @@ class XTSOrderExecutor extends OrderExecutor {
         const payload = {
             exchangeSegment: Number(exchangeSegment) || exchangeSegment,
             exchangeInstrumentID: Number(exchangeInstrumentID) || exchangeInstrumentID,
-            productType: 'MIS',
-            orderType: 'MARKET',
+            productType: orderDetails.productType || 'MIS',
+            orderType: orderDetails.orderType || 'LIMIT',
             orderSide: orderDetails.action,
             orderQuantity: orderDetails.quantity,
             disclosedQuantity: 0,
             validity: 'DAY',
             orderValue: 0,
-            isStopLossOrder: false,
-            stopLossPrice: 0,
+            isStopLossOrder: orderDetails.orderType === 'COVER',
+            stopLossPrice: orderDetails.stopLossPrice || 0,
+            limitPrice: orderDetails.limitPrice || 0,
             isVTDOrder: false,
             vtdMarketProtectionPercentage: 0,
             isIOCOrder: false,
@@ -63,13 +64,20 @@ class XTSOrderExecutor extends OrderExecutor {
         console.log(`Payload: ${JSON.stringify(payload)}`);
 
         try {
-            console.log(`Placing order: ${orderDetails.action} ${orderDetails.quantity} for ${orderDetails.symbol}`);
+            console.log(`Placing ${orderDetails.orderType || 'LIMIT'} order: ${orderDetails.action} ${orderDetails.quantity} for ${orderDetails.symbol}`);
             const response = await this.client.post('/interactive/orders', payload);
             return response.data;
         } catch (error) {
             console.error('Order placement failed:', error.response?.data || error.message);
             throw error;
         }
+    }
+
+    /**
+     * @deprecated Use placeOrder() instead
+     */
+    async placeMarketOrder(orderDetails) {
+        return this.placeOrder({ ...orderDetails, orderType: 'MARKET' });
     }
 
     async getOrderStatus(orderId) {
