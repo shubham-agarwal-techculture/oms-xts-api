@@ -32,7 +32,7 @@ class XTSOrderExecutor extends OrderExecutor {
     }
 
     async placeMarketOrder(orderDetails) {
-        // if (!this.token) await this.login();
+        if (!this.token) await this.login();
 
         let exchangeSegment, exchangeInstrumentID;
         if (orderDetails.symbol.includes('_')) {
@@ -73,20 +73,20 @@ class XTSOrderExecutor extends OrderExecutor {
     }
 
     async getOrderStatus(orderId) {
-        // if (!this.token) await this.login();
+        if (!this.token) await this.login();
         const response = await this.client.get(`/interactive/orders/${orderId}`);
         return response.data;
     }
 
     async getPositions() {
-        // if (!this.token) await this.login();
+        if (!this.token) await this.login();
         console.log('Fetching positions from XTS...');
         const response = await this.client.get('/portfolio/positions');
         return response.data;
     }
 
     async squareOffPosition(details) {
-        // if (!this.token) await this.login();
+        if (!this.token) await this.login();
         let exchangeSegment, exchangeInstrumentID;
         if (details.symbol.includes('_')) {
             [exchangeSegment, exchangeInstrumentID] = details.symbol.split('_');

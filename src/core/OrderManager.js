@@ -260,6 +260,26 @@ class OrderManager extends EventEmitter {
                     );
                     const qty = Number(pos.NetQty);
                     if (qty === 0) {
+                        const existing = this.positions.get(symbol);
+                        if (existing && existing.qty !== 0) {
+                            const exitPrice = Number(pos.NetPrice) || this.resolveFillPrice(symbol) || existing.avgPrice || 0;
+                            const closed = {
+                                symbol,
+                                entryPrice: existing.avgPrice,
+                                exitPrice,
+                                qty: Math.abs(existing.qty),
+                                pnl: (exitPrice - existing.avgPrice) * existing.qty,
+                                timestamp: Date.now()
+                            };
+                            this.historicalPositions.push(closed);
+                            this.emit('historyUpdate', closed);
+                            this.emit('order', {
+                                signal: { symbol, position: 'flat', quantity: Math.abs(existing.qty) },
+                                result: { message: 'Auto square-off via position sync' },
+                                status: 'SQUARED_OFF',
+                                timestamp: Date.now()
+                            });
+                        }
                         this.positions.delete(symbol);
                         return;
                     }

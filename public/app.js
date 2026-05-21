@@ -47,9 +47,9 @@ socket.on('disconnect', () => {
 
 socket.on('state', (data) => {
     state.positions = data.positions || [];
-    state.alerts = data.alerts || [];
-    state.orders = data.orders || [];
-    state.history = data.historicalPositions || [];
+    state.alerts = (data.alerts || []).reverse();
+    state.orders = (data.orders || []).reverse();
+    state.history = (data.historicalPositions || []).reverse();
     renderAll();
 });
 
@@ -57,12 +57,14 @@ socket.on('alert', (alert) => {
     state.alerts.unshift(alert);
     if (state.alerts.length > MAX_UI_ITEMS) state.alerts.pop();
     renderAlerts();
+    triggerFlicker(alertsLog);
 });
 
 socket.on('order', (order) => {
     state.orders.unshift(order);
     if (state.orders.length > MAX_UI_ITEMS) state.orders.pop();
     renderOrders();
+    triggerFlicker(ordersLog);
 });
 
 socket.on('positionUpdate', (pos) => {
@@ -90,6 +92,7 @@ socket.on('historyUpdate', (item) => {
     state.history.unshift(item);
     if (state.history.length > MAX_UI_ITEMS) state.history.pop();
     renderHistory();
+    triggerFlicker(historyLog);
 });
 
 // Render Functions
@@ -98,6 +101,15 @@ function renderAll() {
     renderAlerts();
     renderOrders();
     renderHistory();
+}
+
+function triggerFlicker(element) {
+    element.classList.remove('log-flicker');
+    void element.offsetWidth; // Trigger reflow
+    element.classList.add('log-flicker');
+    setTimeout(() => {
+        element.classList.remove('log-flicker');
+    }, 600);
 }
 
 function formatPrice(value) {

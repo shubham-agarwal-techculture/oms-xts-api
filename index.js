@@ -16,8 +16,8 @@ function createMarketData() {
     }
     return new XTSMarketDataAdapter({
         baseUrl: process.env.XTS_MARKET_DATA_URL,
-        appKey: process.env.XTS_APP_KEY,
-        secretKey: process.env.XTS_SECRET_KEY
+        appKey: process.env.XTS_MARKET_DATA_APP_KEY,
+        secretKey: process.env.XTS_MARKET_DATA_SECRET_KEY
     });
 }
 
@@ -28,8 +28,9 @@ function createOrderExecutor() {
     }
     return new XTSOrderExecutor({
         baseUrl: process.env.XTS_INTERACTIVE_URL,
-        appKey: process.env.XTS_APP_KEY,
-        secretKey: process.env.XTS_SECRET_KEY
+        appKey: process.env.XTS_INTERACTIVE_APP_KEY,
+        secretKey: process.env.XTS_INTERACTIVE_SECRET_KEY,
+        userId: process.env.XTS_INTERACTIVE_USER_ID
     });
 }
 

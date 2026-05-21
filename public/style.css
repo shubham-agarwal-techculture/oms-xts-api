@@ -138,6 +138,17 @@ header {
     50% { transform: scale(1.15); opacity: 1; box-shadow: 0 0 16px var(--up-color); }
 }
 
+@keyframes log-flicker {
+    0%, 100% { border-color: var(--down-color); box-shadow: 0 0 20px var(--down-glow); }
+    25% { border-color: var(--up-color); box-shadow: 0 0 20px var(--up-glow); }
+    50% { border-color: var(--down-color); box-shadow: 0 0 20px var(--down-glow); }
+    75% { border-color: var(--up-color); box-shadow: 0 0 20px var(--up-glow); }
+}
+
+.log-flicker {
+    animation: log-flicker 0.6s ease-in-out;
+}
+
 /* Theme Toggle Button */
 .theme-toggle-btn {
     background: rgba(255, 255, 255, 0.05);

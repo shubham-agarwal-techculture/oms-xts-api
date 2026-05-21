@@ -11,7 +11,7 @@ class OmsStateStore {
         this.debounceMs = Number(process.env.OMS_PERSIST_DEBOUNCE_MS) || 400;
         this.timer = null;
         /** @type {(() => object) | null} */
-        this.getSnapshot = null;
+        this.getSnapshot = null;k
     }
 
     ensureDir() {

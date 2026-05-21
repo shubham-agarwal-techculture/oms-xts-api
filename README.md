@@ -167,10 +167,14 @@ Example payloads are also in `scratch/signal.json` and `scratch/flat_signal.json
 | :--- | :--- | :--- |
 | `ORDER_EXECUTOR` | *(XTS)* | Set to `mock` to use `MockOrderExecutor` (no broker API calls). |
 | `MARKET_DATA_PROVIDER` | *(XTS)* | Set to `python` to use `PythonSidecarAdapter`. |
-| `XTS_MARKET_DATA_URL` | — | XTS market data URL (`ws://…` for dummy/raw WebSocket, or HTTP base URL for standard XTS). |
-| `XTS_INTERACTIVE_URL` | — | XTS interactive API base URL (e.g. `http://127.0.0.1:8001`). |
-| `XTS_APP_KEY` | — | XTS application key. |
-| `XTS_SECRET_KEY` | — | XTS secret key. |
+| `XTS_MARKET_DATA_URL` | — | XTS market data URL (HTTP base URL for standard XTS, or `ws://…` for dummy raw WebSocket). |
+| `XTS_MARKET_DATA_APP_KEY` | — | XTS market data application key. |
+| `XTS_MARKET_DATA_SECRET_KEY` | — | XTS market data secret key. |
+| `XTS_SOURCE` | — | XTS API source (e.g. `WebAPI`). |
+| `XTS_INTERACTIVE_URL` | — | XTS interactive API base URL. |
+| `XTS_INTERACTIVE_APP_KEY` | — | XTS interactive application key. |
+| `XTS_INTERACTIVE_SECRET_KEY` | — | XTS interactive secret key. |
+| `XTS_INTERACTIVE_USER_ID` | — | XTS interactive user ID. |
 | `PYTHON_MARKET_DATA_SCRIPT` | — | Path to Python script when using the sidecar adapter. |
 | `MARKET_DATA_SYMBOL` | `btcusdt` | Active symbol for Python sidecar / symbol resolution. |
 | `PYTHON_MOCK_PRICE` | — | If set, skips the Python subprocess and uses this fixed price. |
