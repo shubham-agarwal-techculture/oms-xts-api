@@ -1,0 +1,1276 @@
+[
+  {
+    "index": 0,
+    "fields": [
+      "undefined",
+      "NIFTY BHARAT BOND INDEX - APRIL 2033",
+      "1",
+      "1",
+      "BHARATBOND-APR33-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 1,
+    "fields": [
+      "NIFTY GS 10YR",
+      "1",
+      "1",
+      "NIFTY GS 10YR-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY HEALTHCARE"
+    ]
+  },
+  {
+    "index": 2,
+    "fields": [
+      "1",
+      "1",
+      "NIFTY HEALTHCARE-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY METAL",
+      "1"
+    ]
+  },
+  {
+    "index": 3,
+    "fields": [
+      "1",
+      "NIFTY METAL-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY GS 10YR CLN",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 4,
+    "fields": [
+      "NIFTY GS 10YR CLN-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY ALPHA 50",
+      "1",
+      "1",
+      "NIFTY ALPHA 50-SPOT"
+    ]
+  },
+  {
+    "index": 5,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY MIDSMALL FINANCIAL SERVICES",
+      "1",
+      "1",
+      "Nifty MS Fin Serv-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 6,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY CORE HOUSING",
+      "1",
+      "1",
+      "Nifty CoreHousing-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 7,
+    "fields": [
+      "-1",
+      "NIFTY50 PR 2X LEV",
+      "1",
+      "1",
+      "NIFTY50 PR 2X LEV-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 8,
+    "fields": [
+      "NIFTY100 QUALTY30",
+      "1",
+      "1",
+      "NIFTY100 QUALTY30-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY RURAL"
+    ]
+  },
+  {
+    "index": 9,
+    "fields": [
+      "1",
+      "1",
+      "Nifty Rural-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY50 DIV POINT",
+      "1"
+    ]
+  },
+  {
+    "index": 10,
+    "fields": [
+      "1",
+      "NIFTY50 DIV POINT-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY COMMODITIES",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 11,
+    "fields": [
+      "NIFTY COMMODITIES-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY SERV SECTOR",
+      "1",
+      "1",
+      "NIFTY SERV SECTOR-SPOT"
+    ]
+  },
+  {
+    "index": 12,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY100 LOWVOL30",
+      "1",
+      "1",
+      "NIFTY100 LOWVOL30-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 13,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY BHARAT BOND INDEX - APRIL 2031 ",
+      "1",
+      "1",
+      "BHARATBOND-APR31-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 14,
+    "fields": [
+      "-1",
+      "NIFTY100 ALPHA 30",
+      "1",
+      "1",
+      "Nifty100 Alpha 30-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 15,
+    "fields": [
+      "NIFTY DIV OPPS 50",
+      "1",
+      "1",
+      "NIFTY DIV OPPS 50-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY ENERGY"
+    ]
+  },
+  {
+    "index": 16,
+    "fields": [
+      "1",
+      "1",
+      "NIFTY ENERGY-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY500 VALUE 50",
+      "1"
+    ]
+  },
+  {
+    "index": 17,
+    "fields": [
+      "1",
+      "Nifty500 Value 50-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY50 VALUE 20",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 18,
+    "fields": [
+      "NIFTY50 VALUE 20-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "INDIA VIX",
+      "1",
+      "1",
+      "INDIA VIX-SPOT"
+    ]
+  },
+  {
+    "index": 19,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY500 MOMENTUM 50",
+      "1",
+      "1",
+      "Nifty500Momentm50-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 20,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY MID SELECT",
+      "1",
+      "1",
+      "NIFTY MID SELECT-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 21,
+    "fields": [
+      "-1",
+      "NIFTY200 QUALTY30",
+      "1",
+      "1",
+      "NIFTY200 QUALTY30-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 22,
+    "fields": [
+      "NIFTY50 PR 1X INV",
+      "1",
+      "1",
+      "NIFTY50 PR 1X INV-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY GS 4 8YR"
+    ]
+  },
+  {
+    "index": 23,
+    "fields": [
+      "1",
+      "1",
+      "NIFTY GS 4 8YR-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY FINANCIAL SERVICES EX-BANK",
+      "1"
+    ]
+  },
+  {
+    "index": 24,
+    "fields": [
+      "1",
+      "Nifty FinSerExBnk-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY GROWSECT 15",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 25,
+    "fields": [
+      "NIFTY GROWSECT 15-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY50 TR 1X INV",
+      "1",
+      "1",
+      "NIFTY50 TR 1X INV-SPOT"
+    ]
+  },
+  {
+    "index": 26,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY REALTY",
+      "1",
+      "1",
+      "NIFTY REALTY-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 27,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY INFRA",
+      "1",
+      "1",
+      "NIFTY INFRA-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 28,
+    "fields": [
+      "-1",
+      "NIFTY GS COMPSITE",
+      "1",
+      "1",
+      "NIFTY GS COMPSITE-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 29,
+    "fields": [
+      "NIFTY BHARAT BOND INDEX - APRIL 2025",
+      "1",
+      "1",
+      "BHARATBOND-APR25-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY CAPITAL MARKETS"
+    ]
+  },
+  {
+    "index": 30,
+    "fields": [
+      "1",
+      "1",
+      "Nifty Capital Mkt-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY INDIA TOURISM ",
+      "1"
+    ]
+  },
+  {
+    "index": 31,
+    "fields": [
+      "1",
+      "Nifty Ind Tourism-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY MIDSML 400",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 32,
+    "fields": [
+      "NIFTY MIDSML 400-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY100 EQL WGT",
+      "1",
+      "1",
+      "NIFTY100 EQL WGT-SPOT"
+    ]
+  },
+  {
+    "index": 33,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY FINSRV25 50",
+      "1",
+      "1",
+      "NIFTY FINSRV25 50-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 34,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY50 SHARIAH",
+      "1",
+      "1",
+      "Nifty50 Shariah-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 35,
+    "fields": [
+      "-1",
+      "NIFTY MIDSMALL INDIA CONSUMPTION",
+      "1",
+      "1",
+      "Nifty MS Ind Cons-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 36,
+    "fields": [
+      "NIFTY500 MULTICAP",
+      "1",
+      "1",
+      "NIFTY500 MULTICAP-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "HANGSENG BEES-NAV"
+    ]
+  },
+  {
+    "index": 37,
+    "fields": [
+      "1",
+      "1",
+      "HANGSENG BEES-NAV-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY500 EQUAL WEIGHT",
+      "1"
+    ]
+  },
+  {
+    "index": 38,
+    "fields": [
+      "1",
+      "Nifty500 EW-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY OIL AND GAS",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 39,
+    "fields": [
+      "NIFTY OIL AND GAS-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY CONSUMPTION",
+      "1",
+      "1",
+      "NIFTY CONSUMPTION-SPOT"
+    ]
+  },
+  {
+    "index": 40,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY INDIA DEFENCE",
+      "1",
+      "1",
+      "Nifty Ind Defence-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 41,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY FIN SERVICE",
+      "1",
+      "1",
+      "NIFTY FIN SERVICE-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 42,
+    "fields": [
+      "-1",
+      "NIFTY PVT BANK",
+      "1",
+      "1",
+      "NIFTY PVT BANK-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 43,
+    "fields": [
+      "NIFTY IT",
+      "1",
+      "1",
+      "NIFTY IT-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY500 MULTICAP INFRASTRUCTURE 50:30:20"
+    ]
+  },
+  {
+    "index": 44,
+    "fields": [
+      "1",
+      "1",
+      "NIFTY MULTI INFRA-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY BHARAT BOND INDEX - APRIL 2032",
+      "1"
+    ]
+  },
+  {
+    "index": 45,
+    "fields": [
+      "1",
+      "BHARATBOND-APR32-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY500 LARGEMIDSMALL EQUAL-CAP WEIGHTED",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 46,
+    "fields": [
+      "Nifty500 LMS Eql-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY 100",
+      "1",
+      "1",
+      "NIFTY 100-SPOT"
+    ]
+  },
+  {
+    "index": 47,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY LARGEMID250",
+      "1",
+      "1",
+      "NIFTY LARGEMID250-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 48,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY GS 11 15YR",
+      "1",
+      "1",
+      "NIFTY GS 11 15YR-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 49,
+    "fields": [
+      "-1",
+      "NIFTY NON-CYCLICAL CONSUMER",
+      "1",
+      "1",
+      "Nifty NonCyc Cons-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 50,
+    "fields": [
+      "NIFTY50 EQL WGT",
+      "1",
+      "1",
+      "NIFTY50 EQL WGT-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY MIDSMALL IT & TELECOM"
+    ]
+  },
+  {
+    "index": 51,
+    "fields": [
+      "1",
+      "1",
+      "Nifty MS IT Telcm-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY PSU BANK",
+      "1"
+    ]
+  },
+  {
+    "index": 52,
+    "fields": [
+      "1",
+      "NIFTY PSU BANK-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY TOP 10 EQUAL WEIGHT",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 53,
+    "fields": [
+      "Nifty Top 10 EW-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY NEXT 50",
+      "1",
+      "1",
+      "NIFTY NEXT 50-SPOT"
+    ]
+  },
+  {
+    "index": 54,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY IPO",
+      "1",
+      "1",
+      "Nifty IPO-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 55,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY CONSR DURBL",
+      "1",
+      "1",
+      "NIFTY CONSR DURBL-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 56,
+    "fields": [
+      "-1",
+      "NIFTY BHARAT BOND INDEX - APRIL 2030",
+      "1",
+      "1",
+      "BHARATBOND-APR30-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 57,
+    "fields": [
+      "NIFTY MIDSMALL HEALTHCARE",
+      "1",
+      "1",
+      "NIFTY MIDSML HLTH-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY MEDIA"
+    ]
+  },
+  {
+    "index": 58,
+    "fields": [
+      "1",
+      "1",
+      "NIFTY MEDIA-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY GS 8 13YR",
+      "1"
+    ]
+  },
+  {
+    "index": 59,
+    "fields": [
+      "1",
+      "NIFTY GS 8 13YR-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY MID LIQ 15",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 60,
+    "fields": [
+      "NIFTY MID LIQ 15-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY200 VALUE 30",
+      "1",
+      "1",
+      "Nifty200 Value 30-SPOT"
+    ]
+  },
+  {
+    "index": 61,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY100 ENHANCED ESG",
+      "1",
+      "1",
+      "Nifty100 Enh ESG-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 62,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY TRANSPORTATION & LOGISTICS",
+      "1",
+      "1",
+      "Nifty Trans Logis-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 63,
+    "fields": [
+      "-1",
+      "NIFTY HOUSING",
+      "1",
+      "1",
+      "Nifty Housing-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 64,
+    "fields": [
+      "NIFTY EV & NEW AGE AUTOMOTIVE",
+      "1",
+      "1",
+      "Nifty EV-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY TOP 20 EQUAL WEIGHT"
+    ]
+  },
+  {
+    "index": 65,
+    "fields": [
+      "1",
+      "1",
+      "Nifty Top 20 EW-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY100 LIQ 15",
+      "1"
+    ]
+  },
+  {
+    "index": 66,
+    "fields": [
+      "1",
+      "NIFTY100 LIQ 15-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY ALPHA QUALITY LOW-VOLATILITY 30",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 67,
+    "fields": [
+      "Nifty AQL 30-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY ALPHALOWVOL",
+      "1",
+      "1",
+      "NIFTY ALPHALOWVOL-SPOT"
+    ]
+  },
+  {
+    "index": 68,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY SMALLCAP250 MOMENTUM QUALITY 100",
+      "1",
+      "1",
+      "NiftySml250MQ 100-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 69,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY AUTO",
+      "1",
+      "1",
+      "NIFTY AUTO-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 70,
+    "fields": [
+      "-1",
+      "NIFTY MOBILITY",
+      "1",
+      "1",
+      "Nifty Mobility-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 71,
+    "fields": [
+      "NIFTY TOP 15 EQUAL WEIGHT",
+      "1",
+      "1",
+      "Nifty Top 15 EW-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY200MOMENTM30"
+    ]
+  },
+  {
+    "index": 72,
+    "fields": [
+      "1",
+      "1",
+      "NIFTY200MOMENTM30-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY LOW VOLATILITY 50",
+      "1"
+    ]
+  },
+  {
+    "index": 73,
+    "fields": [
+      "1",
+      "Nifty Low Vol 50-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY500 MULTICAP INDIA MANUFACTURING 50:30:20",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 74,
+    "fields": [
+      "NIFTY MULTI MFG-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY SHARIAH 25",
+      "1",
+      "1",
+      "Nifty Shariah 25-SPOT"
+    ]
+  },
+  {
+    "index": 75,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY500 MULTICAP MOMENTUM QUALITY 50",
+      "1",
+      "1",
+      "Nifty Multi MQ 50-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 76,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY500 SHARIAH",
+      "1",
+      "1",
+      "Nifty500 Shariah-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 77,
+    "fields": [
+      "-1",
+      "NIFTY100ESGSECLDR",
+      "1",
+      "1",
+      "NIFTY100ESGSECLDR-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 78,
+    "fields": [
+      "NIFTY MIDCAP 50",
+      "1",
+      "1",
+      "NIFTY MIDCAP 50-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY 200"
+    ]
+  },
+  {
+    "index": 79,
+    "fields": [
+      "1",
+      "1",
+      "NIFTY 200-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY SMLCAP 50",
+      "1"
+    ]
+  },
+  {
+    "index": 80,
+    "fields": [
+      "1",
+      "NIFTY SMLCAP 50-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY MNC",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 81,
+    "fields": [
+      "NIFTY MNC-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY 50",
+      "1",
+      "1",
+      "NIFTY 50-SPOT"
+    ]
+  },
+  {
+    "index": 82,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY HIGH BETA 50",
+      "1",
+      "1",
+      "Nifty HighBeta 50-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 83,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY GS 15YRPLUS",
+      "1",
+      "1",
+      "NIFTY GS 15YRPLUS-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 84,
+    "fields": [
+      "-1",
+      "NIFTY TATA GROUP 25% CAP",
+      "1",
+      "1",
+      "NIFTY TATA 25 CAP-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 85,
+    "fields": [
+      "NIFTY MIDCAP 150",
+      "1",
+      "1",
+      "NIFTY MIDCAP 150-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY INDIA NEW AGE CONSUMPTION"
+    ]
+  },
+  {
+    "index": 86,
+    "fields": [
+      "1",
+      "1",
+      "Nifty New Consump-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY PSE",
+      "1"
+    ]
+  },
+  {
+    "index": 87,
+    "fields": [
+      "1",
+      "NIFTY PSE-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY CPSE",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 88,
+    "fields": [
+      "NIFTY CPSE-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY ALPHA QUALITY VALUE LOW-VOLATILITY 30",
+      "1",
+      "1",
+      "Nifty AQLV 30-SPOT"
+    ]
+  },
+  {
+    "index": 89,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY SMLCAP 250",
+      "1",
+      "1",
+      "NIFTY SMLCAP 250-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 90,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY50 TR 2X LEV",
+      "1",
+      "1",
+      "NIFTY50 TR 2X LEV-SPOT",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 91,
+    "fields": [
+      "-1",
+      "NIFTY PHARMA",
+      "1",
+      "1",
+      "NIFTY PHARMA-SPOT",
+      "-1",
+      "-1",
+      "-1"
+    ]
+  },
+  {
+    "index": 92,
+    "fields": [
+      "NIFTY FMCG",
+      "1",
+      "1",
+      "NIFTY FMCG-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY MIDSMALLCAP400 MOMENTUM QUALITY 100"
+    ]
+  },
+  {
+    "index": 93,
+    "fields": [
+      "1",
+      "1",
+      "NiftyMS400 MQ 100-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY 500",
+      "1"
+    ]
+  },
+  {
+    "index": 94,
+    "fields": [
+      "1",
+      "NIFTY 500-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY MIDCAP 100",
+      "1",
+      "1"
+    ]
+  },
+  {
+    "index": 95,
+    "fields": [
+      "NIFTY MIDCAP 100-SPOT",
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY BANK",
+      "1",
+      "1",
+      "NIFTY BANK-SPOT"
+    ]
+  },
+  {
+    "index": 96,
+    "fields": [
+      "-1",
+      "-1",
+      "-1",
+      "NIFTY INDIA SELECT 5 CORPORATE GROUPS (MAATR)",
+      "1",
+      "1",
+      "Nifty Corp MAATR-SPOT",
+      "-1"
+    ]
+  },
+  {
+    "index": 97,
+    "fields": [
+      "-1",
+      "-1",
+      "NIFTY SMLCAP 100",
+      "1",
+      "1",
+      "NIFTY SMLCAP 100-SPOT",
+      "-1",
+      "-1"
+    ]
+  }
+]

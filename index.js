@@ -21,7 +21,7 @@ function createMarketData() {
     });
 }
 
-function createOrderExecutor() {
+function createOrderExecutor(marketDataConfig) {
     if (process.env.ORDER_EXECUTOR === 'mock') {
         console.log('Using MockOrderExecutor (no broker API calls)');
         return new MockOrderExecutor();
@@ -30,16 +30,22 @@ function createOrderExecutor() {
         baseUrl: process.env.XTS_INTERACTIVE_URL,
         appKey: process.env.XTS_INTERACTIVE_APP_KEY,
         secretKey: process.env.XTS_INTERACTIVE_SECRET_KEY,
-        userId: process.env.XTS_INTERACTIVE_USER_ID
+        userId: process.env.XTS_INTERACTIVE_USER_ID,
+        marketDataConfig: marketDataConfig
     });
 }
 
 async function main() {
     try {
         // 1. Initialize Adapters
-        const marketData = createMarketData();
+        const marketDataConfig = {
+            baseUrl: process.env.XTS_MARKET_DATA_URL,
+            appKey: process.env.XTS_MARKET_DATA_APP_KEY,
+            secretKey: process.env.XTS_MARKET_DATA_SECRET_KEY
+        };
+        const marketData = new XTSMarketDataAdapter(marketDataConfig);
         const signalSource = new RESTSignalReceiver(process.env.SIGNAL_PORT || 5001);
-        const orderExecutor = createOrderExecutor();
+        const orderExecutor = createOrderExecutor(marketDataConfig);
 
         // 2. Initialize Core
         const oms = new OrderManager({
@@ -55,6 +61,10 @@ async function main() {
         console.log('Starting OMS...');
 
         await marketData.connect();
+        
+        // Load instrument masters and symbol map
+        console.log('Loading instrument masters...');
+        await orderExecutor.loadSymbolMap(['NSECM']); // Load NSECM segment
 
         signalSource.start();
         dashboard.start();

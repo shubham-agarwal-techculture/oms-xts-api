@@ -1,4 +1,5 @@
 const OrderExecutor = require('../interfaces/OrderExecutor');
+const InstrumentMasterManager = require('./InstrumentMasterManager');
 const axios = require('axios');
 const https = require('https');
 
@@ -13,6 +14,65 @@ class XTSOrderExecutor extends OrderExecutor {
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new https.Agent({ rejectUnauthorized: false })
         });
+        
+        // Initialize Instrument Master Manager with Market Data API config
+        this.masterManager = new InstrumentMasterManager(config.marketDataConfig || config);
+        
+        // Default symbol map (will be replaced with loaded master data)
+        this.symbolMap = {
+            'NIFTY': { exchangeSegment: 1, exchangeInstrumentID: 22 },
+            'NIFTY50': { exchangeSegment: 1, exchangeInstrumentID: 22 }
+        };
+        
+        // Flag to track if symbol map is loaded
+        this.symbolMapLoaded = false;
+    }
+    
+    /**
+     * Load instrument masters and build symbol map
+     * @param {Array<string>} exchangeSegmentCodes - Exchange segment codes to load
+     */
+    async loadSymbolMap(exchangeSegmentCodes = ['NSECM']) {
+        if (this.symbolMapLoaded) {
+            console.log('Symbol map already loaded');
+            return;
+        }
+        
+        console.log('Loading instrument masters and building symbol map...');
+        this.symbolMap = await this.masterManager.buildSymbolMap(exchangeSegmentCodes);
+        this.symbolMapLoaded = true;
+        console.log(`Symbol map loaded with ${Object.keys(this.symbolMap).length} symbols`);
+    }
+    
+    /**
+     * Resolve symbol to XTS instrument (exchangeSegment and exchangeInstrumentID)
+     * @param {string} symbol - Symbol name or 'segment_instrumentId' format
+     * @returns {Object} { exchangeSegment, exchangeInstrumentID }
+     */
+    resolveInstrument(symbol) {
+        // If symbol is already in 'segment_instrumentId' format
+        if (symbol && symbol.includes('_')) {
+            const [exchangeSegment, exchangeInstrumentID] = symbol.split('_');
+            return {
+                exchangeSegment: Number(exchangeSegment) || exchangeSegment,
+                exchangeInstrumentID: Number(exchangeInstrumentID) || exchangeInstrumentID
+            };
+        }
+        
+        // Default to NIFTY if symbol is not provided or empty
+        const targetSymbol = (symbol || 'NIFTY').toUpperCase().trim();
+        
+        // Check if symbol exists in our mapping
+        if (this.symbolMap[targetSymbol]) {
+            return this.symbolMap[targetSymbol];
+        }
+        
+        // Fallback: try to use as instrument ID with default segment (1 = NSE)
+        console.warn(`Symbol '${targetSymbol}' not found in mapping, using as instrument ID with segment 1`);
+        return {
+            exchangeSegment: 1,
+            exchangeInstrumentID: Number(targetSymbol) || targetSymbol
+        };
     }
 
     async login() {
@@ -34,13 +94,7 @@ class XTSOrderExecutor extends OrderExecutor {
     async placeOrder(orderDetails) {
         if (!this.token) await this.login();
 
-        let exchangeSegment, exchangeInstrumentID;
-        if (orderDetails.symbol.includes('_')) {
-            [exchangeSegment, exchangeInstrumentID] = orderDetails.symbol.split('_');
-        } else {
-            exchangeSegment = 1;
-            exchangeInstrumentID = orderDetails.symbol;
-        }
+        const { exchangeSegment, exchangeInstrumentID } = this.resolveInstrument(orderDetails.symbol);
 
         const payload = {
             exchangeSegment: Number(exchangeSegment) || exchangeSegment,
@@ -95,13 +149,7 @@ class XTSOrderExecutor extends OrderExecutor {
 
     async squareOffPosition(details) {
         if (!this.token) await this.login();
-        let exchangeSegment, exchangeInstrumentID;
-        if (details.symbol.includes('_')) {
-            [exchangeSegment, exchangeInstrumentID] = details.symbol.split('_');
-        } else {
-            exchangeSegment = 1;
-            exchangeInstrumentID = details.symbol;
-        }
+        const { exchangeSegment, exchangeInstrumentID } = this.resolveInstrument(details.symbol);
 
         const payload = {
             exchangeSegment: Number(exchangeSegment) || exchangeSegment,

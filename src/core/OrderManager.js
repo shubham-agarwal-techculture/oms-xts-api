@@ -18,7 +18,7 @@ class OrderManager extends EventEmitter {
         this.alerts = [];
         this.positions = new Map(); // symbol -> { qty, avgPrice, totalCost, lastOrderQty, targetQty, side }
         this.historicalPositions = [];
-        this.defaultSymbol = process.env.DEFAULT_SYMBOL || '1_22';
+        this.defaultSymbol = process.env.DEFAULT_SYMBOL || 'NIFTY';
         this.maxPersistedItems = Math.max(100, Number(process.env.OMS_MAX_STATE_ITEMS) || 5000);
         this.uiStateWindow = Math.max(50, Number(process.env.OMS_UI_STATE_WINDOW) || 500);
         const statePath =
@@ -225,7 +225,8 @@ class OrderManager extends EventEmitter {
             const activeSymbol = typeof this.marketData.getActiveSymbol === 'function'
                 ? this.marketData.getActiveSymbol()
                 : null;
-            signal.symbol = this.normalizeSymbol(signal.symbol || activeSymbol || this.defaultSymbol);
+            // If no symbol in signal, use active symbol or default to 'NIFTY'
+            signal.symbol = this.normalizeSymbol(signal.symbol || activeSymbol || 'NIFTY');
             console.log(`Resolved symbol ${signal.symbol} for signal processing`);
             
             this.alerts.push({ ...signal, timestamp: Date.now() });
