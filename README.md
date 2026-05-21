@@ -13,6 +13,7 @@ A loosely coupled Order Management System for automated trading. The OMS receive
 - **Manual square-off** — Exit positions from the dashboard or via the REST API.
 - **Broker sync** — Local positions are reconciled with the broker every 30 seconds.
 - **Durable state** — Orders, alerts, open positions, and trade history are saved to disk and restored on restart.
+- **Instrument master management** — Automatically downloads and caches instrument master files from XTS API, resolves friendly symbols (e.g., "NIFTY", "RELIANCE") to XTS instrument IDs.
 
 ---
 
@@ -50,8 +51,8 @@ graph TD
 
 ### Signal → Order flow
 
-1. A webhook hits `POST /signal` with `action`, `quantity`, and `position` (and optional `orderType`, `limitPrice`, `productType`, `instrumentType`).
-2. `OrderManager` resolves the symbol from the signal, the active market data provider, or `DEFAULT_SYMBOL` (default `1_22`).
+1. A webhook hits `POST /signal` with `action`, `quantity`, and `position` (and optional `orderType`, `limitPrice`, `productType`, `instrumentType`, `symbol`).
+2. **Instrument resolution**: If no symbol is provided, defaults to "NIFTY". Friendly symbols (e.g., "NIFTY", "RELIANCE") are resolved to XTS instrument IDs using the instrument master database.
 3. If `position` is `flat`, the open position for that symbol is squared off.
 4. Otherwise an order (default LIMIT) is placed via the configured order executor — if no limit price is provided, it uses the current market price.
 5. Local position state is updated and events are pushed to connected dashboard clients.
@@ -63,10 +64,11 @@ graph TD
 ```text
 oms-with-xts-api/
 ├── public/                          # Dashboard frontend (HTML, CSS, JS)
-├── data/                            # Created at runtime; oms-state.json is gitignored
+├── data/                            # Created at runtime; oms-state.json and masters/ are gitignored
 ├── src/
 │   ├── adapters/
 │   │   ├── DashboardAdapter.js      # Express + Socket.IO server for the UI
+│   │   ├── InstrumentMasterManager.js # Downloads and manages instrument master files from XTS API
 │   │   ├── MockOrderExecutor.js     # Logs orders locally (no broker calls)
 │   │   ├── PythonSidecarAdapter.js  # Market data via a Python subprocess
 │   │   ├── RESTSignalReceiver.js    # Webhook endpoint for trade signals
@@ -179,7 +181,7 @@ Example payloads are also in `scratch/signal.json` and `scratch/flat_signal.json
 | `PYTHON_MARKET_DATA_SCRIPT` | — | Path to Python script when using the sidecar adapter. |
 | `MARKET_DATA_SYMBOL` | `btcusdt` | Active symbol for Python sidecar / symbol resolution. |
 | `PYTHON_MOCK_PRICE` | — | If set, skips the Python subprocess and uses this fixed price. |
-| `DEFAULT_SYMBOL` | `1_22` | Default instrument when the signal omits `symbol`. |
+| `DEFAULT_SYMBOL` | `NIFTY` | Default instrument when the signal omits `symbol` (friendly symbol name). |
 | `SIGNAL_PORT` | `5001` | Port for the REST signal webhook. |
 | `DASHBOARD_PORT` | `3000` | Port for the web dashboard. |
 | `OMS_STATE_PATH` | `<cwd>/data/oms-state.json` | Path to the persisted state file. |
@@ -215,7 +217,9 @@ When pointing at a local dummy XTS server (e.g. `http://127.0.0.1:8001`), the or
 | Get positions | `GET` | `/portfolio/positions` |
 | Square off | `POST` | `/interactive/positions/squareoff` |
 
-Symbol format for XTS orders is `{exchangeSegment}_{exchangeInstrumentId}` (e.g. `1_22`). If no underscore is present, segment `1` is assumed.
+Symbol format for XTS orders can be either:
+- Friendly name: "NIFTY", "RELIANCE", "TCS" — resolved using instrument master
+- XTS format: `{exchangeSegment}_{exchangeInstrumentId}` (e.g., `1_22`). If no underscore is present, segment `1` is assumed.
 
 ---
 
@@ -234,7 +238,7 @@ Receives trade intent and triggers order placement or square-off.
 | `action` | `string` | Yes | `BUY` or `SELL` (case-insensitive). |
 | `quantity` | `number` | Yes | Number of units to trade. |
 | `position` | `string` | Yes | Target position: `long`, `short`, or `flat`. |
-| `symbol` | `string` | No | Instrument identifier. If omitted, resolved from the market data provider's active symbol, then falls back to `1_22`. |
+| `symbol` | `string` | No | Instrument identifier (friendly name like "NIFTY" or "RELIANCE", or format "segment_instrumentId"). If omitted, defaults to "NIFTY". |
 | `orderType` | `string` | No | Order type: `MARKET`, `LIMIT`, or `COVER` — default: `LIMIT`. |
 | `limitPrice` | `number` | No | Limit price (required for LIMIT orders if no current market price is available). |
 | `stopLossPrice` | `number` | No | Stop loss price (for COVER orders). |
@@ -264,7 +268,15 @@ curl -X POST http://localhost:5001/signal \
   -d '{"action": "SELL", "quantity": 100, "position": "flat"}'
 ```
 
-With an explicit symbol:
+With an explicit symbol (friendly name):
+
+```bash
+curl -X POST http://localhost:5001/signal \
+  -H "Content-Type: application/json" \
+  -d '{"symbol": "RELIANCE", "action": "BUY", "quantity": 1, "position": "long"}'
+```
+
+With an explicit symbol (XTS format):
 
 ```bash
 curl -X POST http://localhost:5001/signal \
@@ -319,6 +331,70 @@ Clients connect and receive an initial `state` event, then incremental updates:
 | `priceUpdate` | `{ symbol, price }` | Market price tick |
 | `historyUpdate` | closed trade object | Position closed |
 | `positionsSynced` | position array | Broker reconciliation (every 30s) |
+
+---
+
+## Instrument Master Management
+
+The OMS automatically manages instrument master files from the XTS API to resolve friendly symbols (like "NIFTY", "RELIANCE", "TCS") to XTS instrument IDs.
+
+### Instrument Master Flow Diagram
+
+```mermaid
+flowchart TD
+    Start([App Startup]) --> LoadMasters{Load Instrument Masters?}
+    LoadMasters -->|Yes| CheckDir{Check data/masters/ Directory}
+    CheckDir -->|Dir Exists| CheckFiles{Master Files Exist?}
+    CheckFiles -->|Yes| LoadFromFile[Load Masters from Local Files]
+    CheckFiles -->|No| LoginAPI[Login to XTS API]
+    CheckDir -->|Dir Missing| CreateDir[Create data/masters/ Directory]
+    CreateDir --> LoginAPI
+    LoginAPI --> DownloadMasters[Download Masters from XTS API]
+    DownloadMasters --> ParsePipe[Parse Pipe-Separated Data]
+    ParsePipe --> SaveToFile[Save Masters to data/masters/]
+    LoadFromFile --> BuildSymbolMap[Build Symbol Map]
+    SaveToFile --> BuildSymbolMap
+    BuildSymbolMap --> SymbolReady{Symbol Map Ready?}
+    SymbolReady -->|Yes| ResolveSymbols[Resolve Friendly Symbols to Instrument IDs]
+    
+    ResolveSymbols --> SignalIn[Incoming Signal with Symbol]
+    SignalIn --> CheckSignalSymbol{Signal has Symbol?}
+    CheckSignalSymbol -->|No| UseDefault[Use Default Symbol NIFTY]
+    CheckSignalSymbol -->|Yes| LookupSymbol[Look up Symbol in Map]
+    LookupSymbol --> Found{Symbol Found?}
+    Found -->|Yes| GetInstrument[Get exchangeSegment & exchangeInstrumentID]
+    Found -->|No| UseDefault
+    UseDefault --> GetInstrument
+    GetInstrument --> PlaceOrder[Place Order with XTS Instrument IDs]
+    
+    style CreateDir fill:#e3f2fd
+    style LoginAPI fill:#fff3e0
+    style DownloadMasters fill:#fff3e0
+    style SaveToFile fill:#e8f5e9
+    style LoadFromFile fill:#e3f2fd
+    style BuildSymbolMap fill:#e8f5e9
+    style PlaceOrder fill:#c8e6c9
+```
+
+### How It Works
+
+1. **On Startup**: The OMS checks the `data/masters/` directory for existing instrument master files.
+2. **Download If Missing**: If master files are missing for configured exchange segments (default NSECM), they are downloaded from the XTS API.
+3. **Parse Data**: The pipe-separated response format is parsed into structured instrument objects.
+4. **Save Locally**: Master files are cached locally in `data/masters/` to avoid repeated downloads on every startup.
+5. **Build Symbol Map**: A symbol map is created mapping friendly symbol names, trading symbols, and descriptions to `{ exchangeSegment, exchangeInstrumentID }`.
+6. **Symbol Resolution**: When a signal arrives, friendly symbols are resolved to XTS instrument IDs using the pre-built symbol map.
+
+### Symbol Resolution
+
+Symbols can be provided in two formats:
+1. **Friendly Name**: "NIFTY", "RELIANCE", "TCS", etc. — resolved using the instrument master database.
+2. **XTS Format**: "segment_instrumentId" (e.g., "1_22") — used directly without lookup.
+
+### Master File Storage
+
+- Master files are stored in `data/masters/instrument_master_{segmentCode}.json`
+- The `data/masters/` directory is gitignored to avoid committing large master files
 
 ---
 
