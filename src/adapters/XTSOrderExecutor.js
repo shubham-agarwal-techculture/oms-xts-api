@@ -18,6 +18,9 @@ class XTSOrderExecutor extends OrderExecutor {
         // Initialize Instrument Master Manager with Market Data API config
         this.masterManager = new InstrumentMasterManager(config.marketDataConfig || config);
         
+        // Store all loaded instruments for option selection
+        this.instruments = [];
+        
         // Default symbol map (will be replaced with loaded master data)
         this.symbolMap = {
             'NIFTY': { exchangeSegment: 1, exchangeInstrumentID: 22 },
@@ -39,9 +42,52 @@ class XTSOrderExecutor extends OrderExecutor {
         }
         
         console.log('Loading instrument masters and building symbol map...');
+        
+        // Load all instruments and store them
+        this.instruments = [];
+        for (const segmentCode of exchangeSegmentCodes) {
+            try {
+                const instruments = await this.masterManager.loadMaster(segmentCode);
+                this.instruments.push(...instruments);
+            } catch (error) {
+                console.error(`Failed to load instruments for segment ${segmentCode}:`, error.message);
+            }
+        }
+        
         this.symbolMap = await this.masterManager.buildSymbolMap(exchangeSegmentCodes);
         this.symbolMapLoaded = true;
         console.log(`Symbol map loaded with ${Object.keys(this.symbolMap).length} symbols`);
+    }
+
+    /**
+     * Select OTM option for a given underlying and action
+     * @param {string} underlying - Underlying symbol
+     * @param {string} action - Action (BUY/SELL)
+     * @param {number} underlyingPrice - Current underlying price (optional)
+     * @returns {Object|null} Selected option with tradingSymbol and instrument details
+     */
+    selectOTMOption(underlying, action, underlyingPrice = null) {
+        if (this.instruments.length === 0) {
+            console.warn('No instruments loaded - cannot select option');
+            return null;
+        }
+
+        const selectedOption = this.masterManager.selectOTMOption(
+            this.instruments,
+            underlying,
+            action,
+            underlyingPrice
+        );
+
+        if (selectedOption) {
+            return {
+                tradingSymbol: selectedOption.tradingSymbol,
+                exchangeSegment: selectedOption.exchangeSegment,
+                exchangeInstrumentID: selectedOption.exchangeInstrumentID
+            };
+        }
+
+        return null;
     }
     
     /**

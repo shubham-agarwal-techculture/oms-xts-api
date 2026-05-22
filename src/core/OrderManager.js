@@ -311,12 +311,28 @@ class OrderManager extends EventEmitter {
     }
 
     async handleSignal(signal) {
-        const symbol = this.normalizeSymbol(signal.symbol);
+        let symbol = this.normalizeSymbol(signal.symbol);
         const { quantity, position } = signal;
 
         const currentPrice = this.resolveFillPrice(symbol);
-        const currentQty = (this.positions.get(symbol) || { qty: 0 }).qty;
-        const targetQty = this.getTargetQty(position, quantity);
+        let currentQty = (this.positions.get(symbol) || { qty: 0 }).qty;
+        let targetQty = this.getTargetQty(position, quantity);
+
+        // Try to select OTM option if we're not squaring off
+        let selectedOption = null;
+        if (position !== 'flat' && this.orderExecutor.selectOTMOption) {
+            selectedOption = this.orderExecutor.selectOTMOption(symbol, signal.action, currentPrice);
+            if (selectedOption) {
+                console.log(`Selected OTM option: ${selectedOption.tradingSymbol}`);
+                // Update symbol to the option's trading symbol
+                symbol = selectedOption.tradingSymbol;
+                // Check position for the option instead of the underlying
+                currentQty = (this.positions.get(symbol) || { qty: 0 }).qty;
+                targetQty = this.getTargetQty(position, quantity);
+            } else {
+                console.warn(`Failed to select option for ${symbol}, using underlying directly`);
+            }
+        }
 
         console.log(
             `Processing signal for ${symbol}: position=${position}, signalQty=${quantity}, ` +

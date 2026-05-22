@@ -104,23 +104,101 @@ class InstrumentMasterManager {
         for (const line of instrumentLines) {
             const parts = line.split('|');
             if (parts.length >= 20) {
-                const symbol = parts[3];
-                const tradingSymbol = parts[4];
-                const exchangeInstrumentID = parts[1];
-                const description = parts[18];
+                // Extract and parse ALL fields from XTS instrument master data
+                // Based on actual raw data from XTS API response
+                const instrument = {
+                    exchangeSegmentCode,
+                    exchangeSegment: this.segmentCodeToId[exchangeSegmentCode] || 1,
+                    
+                    // Field 0: Exchange Segment
+                    instrumentType: parts[0],
+                    
+                    // Field 1: Exchange Instrument ID
+                    exchangeInstrumentID: parts[1],
+                    
+                    // Field 2: ?
+                    field2: parts[2],
+                    
+                    // Field 3: Symbol (Underlying)
+                    symbol: parts[3],
+                    
+                    // Field 4: Trading Symbol
+                    tradingSymbol: parts[4],
+                    
+                    // Field 5: Instrument Type Name
+                    instrumentTypeName: parts[5],
+                    
+                    // Field 6: ?
+                    field6: parts[6],
+                    
+                    // Field 7: ?
+                    field7: parts[7],
+                    
+                    // Field 8: Price Numerator
+                    priceNumerator: parts[8],
+                    
+                    // Field 9: Price Denominator
+                    priceDenominator: parts[9],
+                    
+                    // Field 10: ?
+                    field10: parts[10],
+                    
+                    // Field 11: Tick Size
+                    tickSize: parts[11] ? parseFloat(parts[11]) : null,
+                    
+                    // Field 12: Lot Size
+                    lotSize: parts[12] ? parseInt(parts[12], 10) : null,
+                    
+                    // Field 13: ?
+                    field13: parts[13],
+                    
+                    // Field 14: ?
+                    field14: parts[14],
+                    
+                    // Field 15: Symbol again?
+                    field15: parts[15],
+                    
+                    // Field 16: Expiry Date (ISO format: YYYY-MM-DDTHH:mm:ss)
+                    expiry: parts[16],
+                    
+                    // Field 17: Strike Price
+                    strikePrice: parts[17] ? parseFloat(parts[17]) : null,
+                    
+                    // Field 18: ?
+                    field18: parts[18],
+                    
+                    // Field 19: Description (contains option type)
+                    description: parts[19],
+                    
+                    // Additional fields (if any)
+                    raw: parts
+                };
                 
-                // Get numeric segment ID
-                const exchangeSegment = this.segmentCodeToId[exchangeSegmentCode] || 1;
+                // Parse expiry date from field 16 (ISO format)
+                if (instrument.expiry) {
+                    instrument.expiryDate = new Date(instrument.expiry);
+                }
                 
-                if (symbol) {
-                    instruments.push({
-                        symbol,
-                        tradingSymbol,
-                        description,
-                        exchangeSegment,
-                        exchangeInstrumentID,
-                        exchangeSegmentCode
-                    });
+                // Parse option type from description (field 19)
+                if (instrument.description) {
+                    if (instrument.description.includes(' CE ')) {
+                        instrument.optionType = 'CE';
+                    } else if (instrument.description.includes(' PE ')) {
+                        instrument.optionType = 'PE';
+                    }
+                }
+                
+                // Fallback: parse strike and option type from trading symbol if needed
+                if ((!instrument.strikePrice || !instrument.optionType) && instrument.tradingSymbol) {
+                    const parsed = this.parseTradingSymbol(instrument.tradingSymbol);
+                    if (parsed) {
+                        if (!instrument.strikePrice) instrument.strikePrice = parsed.strike;
+                        if (!instrument.optionType) instrument.optionType = parsed.optionType;
+                    }
+                }
+                
+                if (instrument.symbol) {
+                    instruments.push(instrument);
                 }
             }
         }
@@ -240,6 +318,150 @@ class InstrumentMasterManager {
 
         console.log(`Symbol map built with ${Object.keys(symbolMap).length} symbols`);
         return symbolMap;
+    }
+
+    /**
+     * Parse trading symbol into its components
+     * @param {string} tradingSymbol - Trading symbol (e.g., "SBIN26JUN660PE")
+     * @returns {Object|null} Parsed components or null if invalid
+     */
+    parseTradingSymbol(tradingSymbol) {
+        // Pattern: [Underlying][2-digit year][3-letter month][Strike][Option Type]
+        // Example: SBIN26JUN660PE → underlying=SBIN, year=26, month=JUN, strike=660, optionType=PE
+        const match = tradingSymbol.match(/^([A-Z0-9]+)(\d{2})([A-Z]{3})(\d+)(PE|CE)$/);
+        if (!match) return null;
+
+        const [, underlying, yearStr, month, strikeStr, optionType] = match;
+        const strike = parseFloat(strikeStr);
+        const year = 2000 + parseInt(yearStr, 10);
+
+        // Convert month abbreviation to number (0-11)
+        const monthMap = {
+            JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
+            JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11
+        };
+        const monthNum = monthMap[month];
+        if (monthNum === undefined) return null;
+
+        // Create a date object for expiry (approximate, just for comparison)
+        const expiryDate = new Date(year, monthNum, 1);
+
+        return {
+            underlying,
+            year,
+            month,
+            monthNum,
+            strike,
+            optionType,
+            expiryDate
+        };
+    }
+
+    /**
+     * Get all options for a specific underlying from loaded instruments
+     * @param {Array} instruments - List of instruments
+     * @param {string} underlying - Underlying symbol (e.g., "SBIN")
+     * @returns {Array} Filtered list of option instruments
+     */
+    getOptionsForUnderlying(instruments, underlying) {
+        const upperUnderlying = underlying.toUpperCase();
+        return instruments
+            .filter(inst => inst.exchangeSegmentCode === 'NSEFO')
+            .filter(inst => inst.symbol && inst.symbol.toUpperCase() === upperUnderlying);
+    }
+
+    /**
+     * Find the most recent expiry from a list of options
+     * @param {Array} options - List of options
+     * @returns {Date|null} Most recent expiry date
+     */
+    findMostRecentExpiry(options) {
+        const now = new Date();
+        // Set time to start of day to avoid time issues
+        now.setHours(0, 0, 0, 0);
+        
+        const validExpiries = options
+            .filter(opt => opt.expiryDate)
+            .map(opt => {
+                const date = new Date(opt.expiryDate);
+                date.setHours(0, 0, 0, 0);
+                return date;
+            })
+            .filter(date => date >= now)
+            .sort((a, b) => a - b);
+
+        return validExpiries.length > 0 ? validExpiries[0] : null;
+    }
+
+    /**
+     * Select OTM strike option for a given underlying and signal
+     * @param {Array} instruments - List of all instruments
+     * @param {string} underlying - Underlying symbol
+     * @param {string} action - Signal action (BUY/SELL)
+     * @param {number} underlyingPrice - Current price of the underlying (optional)
+     * @returns {Object|null} Selected option instrument
+     */
+    selectOTMOption(instruments, underlying, action, underlyingPrice = null) {
+        const options = this.getOptionsForUnderlying(instruments, underlying);
+        if (options.length === 0) {
+            console.warn(`No options found for underlying: ${underlying}`);
+            return null;
+        }
+
+        const recentExpiry = this.findMostRecentExpiry(options);
+        if (!recentExpiry) {
+            console.warn(`No valid future expiries found for underlying: ${underlying}`);
+            return null;
+        }
+
+        // Filter options with the most recent expiry (using actual expiryDate)
+        const recentExpiryOptions = options.filter(opt => {
+            if (!opt.expiryDate) return false;
+            const optDate = new Date(opt.expiryDate);
+            optDate.setHours(0, 0, 0, 0);
+            return optDate.getTime() === recentExpiry.getTime();
+        });
+
+        // Determine option type based on action:
+        // - BUY signal → CE (Call Option)
+        // - SELL signal → PE (Put Option)
+        const targetOptionType = action === 'BUY' ? 'CE' : 'PE';
+        const targetOptions = recentExpiryOptions.filter(opt => 
+            opt.optionType === targetOptionType
+        );
+
+        if (targetOptions.length === 0) {
+            console.warn(`No ${targetOptionType} options found for expiry: ${recentExpiry.toDateString()}`);
+            return null;
+        }
+
+        // Sort by strike price (use actual strikePrice from master data)
+        targetOptions.sort((a, b) => {
+            const strikeA = a.strikePrice || 0;
+            const strikeB = b.strikePrice || 0;
+            return strikeA - strikeB;
+        });
+
+        // Select OTM strike:
+        // - For CE: first strike > underlying price (if known), otherwise middle strike
+        // - For PE: first strike < underlying price (if known), otherwise middle strike
+        let selectedOption;
+        if (underlyingPrice && typeof underlyingPrice === 'number' && !isNaN(underlyingPrice)) {
+            if (targetOptionType === 'CE') {
+                selectedOption = targetOptions.find(opt => (opt.strikePrice || 0) > underlyingPrice) || targetOptions[targetOptions.length - 1];
+            } else { // PE
+                // Create a copy before reversing to avoid mutating the original
+                const reversedOptions = [...targetOptions].reverse();
+                selectedOption = reversedOptions.find(opt => (opt.strikePrice || 0) < underlyingPrice) || targetOptions[0];
+            }
+        } else {
+            // If we don't have underlying price, pick the middle strike as a fallback
+            const middleIndex = Math.floor(targetOptions.length / 2);
+            selectedOption = targetOptions[middleIndex];
+        }
+
+        console.log(`Selected OTM option: ${selectedOption.tradingSymbol} for underlying ${underlying} (${action})`);
+        return selectedOption;
     }
 }
 
