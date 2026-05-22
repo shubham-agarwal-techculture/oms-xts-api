@@ -15,6 +15,43 @@ class XTSMarketDataAdapter extends MarketDataProvider {
         this.lastPrices = new Map();
         this.lastSymbol = null;
         this.events = new EventEmitter();
+        this.subscribedInstruments = new Set();
+        // Create axios client for REST API calls
+        this.client = axios.create({
+            baseURL: config.baseUrl,
+            headers: { 'Content-Type': 'application/json' },
+            httpsAgent: new https.Agent({ rejectUnauthorized: false })
+        });
+
+        // Add request interceptor to log outgoing requests
+        this.client.interceptors.request.use(request => {
+            console.log('Outgoing Request:', {
+                method: request.method?.toUpperCase(),
+                url: request.baseURL + request.url,
+                headers: request.headers
+            });
+            return request;
+        }, error => {
+            console.error('Request Error:', error);
+            return Promise.reject(error);
+        });
+
+        // Add response interceptor to log incoming responses
+        this.client.interceptors.response.use(response => {
+            console.log('Incoming Response:', {
+                status: response.status,
+                statusText: response.statusText,
+                data: response.data
+            });
+            return response;
+        }, error => {
+            console.error('Response Error:', {
+                status: error.response?.status,
+                statusText: error.response?.statusText,
+                data: error.response?.data
+            });
+            return Promise.reject(error);
+        });
     }
 
     async login() {
@@ -25,21 +62,39 @@ class XTSMarketDataAdapter extends MarketDataProvider {
         
         console.log('Logging in to XTS Market Data...');
         try {
-            const response = await axios.post(`${this.config.baseUrl}/auth/login`, {
+            const response = await this.client.post('/auth/login', {
                 appKey: this.config.appKey,
                 secretKey: this.config.secretKey
-            }, {
-                httpsAgent: new https.Agent({ rejectUnauthorized: false })
             });
 
+            console.log('Login response data:', JSON.stringify(response.data));
             const data = Array.isArray(response.data) ? response.data[0] : response.data;
+            console.log('Parsed login data:', JSON.stringify(data));
             this.token = data?.result?.token;
             this.userID = data?.result?.userID;
             
+            console.log('Extracted token:', this.token ? 'Token received (length: ' + this.token.length + ')' : 'No token');
+            console.log('Extracted userID:', this.userID);
+            
             if (!this.token) throw new Error('Login failed: Token not received');
-            console.log('Login successful');
+            // Set authorization header with raw token (matches XTSOrderExecutor approach)
+            this.client.defaults.headers.common['authorization'] = this.token;
+            this.client.defaults.headers.common['Authorization'] = this.token;
+            this.client.defaults.headers.common['token'] = this.token;
+            this.client.defaults.headers.common['Token'] = this.token;
+            // Remove any Bearer prefix that might have been set
+            delete this.client.defaults.headers.common['Authorization'];
+            this.client.defaults.headers.common['Authorization'] = this.token;
+            console.log('Set authorization header (raw):', this.client.defaults.headers.common['authorization'] ? 'Header set' : 'Header NOT set');
+            console.log('Set token header:', this.client.defaults.headers.common['token'] ? 'Header set' : 'Header NOT set');
+            console.log('Market Data login successful');
         } catch (error) {
-            console.warn('Market Data Login failed, may proceed if using dummy data:', error.message);
+            console.error('Market Data Login failed:', error.response?.data || error.message);
+            if (error.response) {
+                console.error('Login error response status:', error.response.status);
+                console.error('Login error response headers:', JSON.stringify(error.response.headers));
+            }
+            throw error;
         }
     }
 
@@ -99,18 +154,37 @@ class XTSMarketDataAdapter extends MarketDataProvider {
     setupSocketIOEvents() {
         this.socket.on('connect', () => {
             console.log('XTS Market Data (Socket.io) connected');
+            this.events.emit('connected');
+        });
+
+        this.socket.on('disconnect', (reason) => {
+            console.log('XTS Market Data (Socket.io) disconnected:', reason);
+            this.events.emit('disconnected', reason);
+        });
+
+        // Try both possible event names (fixing possible typo 'fkull' → 'full')
+        this.socket.on('1502-json-full', (data) => {
+            try {
+                const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+                this.handleMarketData(parsed);
+            } catch (error) {
+                console.error('Failed to parse Socket.io message (1502-json-full):', error.message);
+            }
         });
 
         this.socket.on('1502-json-fkull', (data) => {
             try {
-                const parsed = JSON.parse(data);
+                const parsed = typeof data === 'string' ? JSON.parse(data) : data;
                 this.handleMarketData(parsed);
             } catch (error) {
-                console.error('Failed to parse Socket.io message:', error.message);
+                console.error('Failed to parse Socket.io message (1502-json-fkull):', error.message);
             }
         });
 
-        this.socket.on('error', (err) => console.error('Socket.io Error:', err));
+        this.socket.on('error', (err) => {
+            console.error('Socket.io Error:', err);
+            this.events.emit('error', err);
+        });
     }
 
     handleMarketData(parsed) {
@@ -139,13 +213,84 @@ class XTSMarketDataAdapter extends MarketDataProvider {
         }
     }
 
-    subscribe(symbol) {
-        // symbol format: "segment_instrumentId"
-        const [segment, instrumentId] = symbol.split('_');
-        if (this.socket && this.socket.connected) {
-            console.log(`Subscribing to ${symbol}`);
-            // XTS subscription logic via REST usually, but socket can also receive if already subscribed
-            // Here we assume the core will handle subscription via REST or we add it here
+    /**
+     * Subscribe to instruments for market data
+     * @param {Array<{exchangeSegment: number, exchangeInstrumentID: number}>} instruments - Instruments to subscribe
+     * @returns {Promise<Object>} API response
+     */
+    async subscribeInstruments(instruments) {
+        if (!this.token) await this.login();
+        
+        const instrumentKeys = instruments.map(instr => `${instr.exchangeSegment}_${instr.exchangeInstrumentID}`);
+        instrumentKeys.forEach(key => this.subscribedInstruments.add(key));
+        
+        console.log(`Subscribing to ${instruments.length} instruments...`);
+        console.log('Current token:', this.token ? 'Token exists (length: ' + this.token.length + ')' : 'No token');
+        console.log('Authorization header in client:', this.client.defaults.headers.common['authorization'] ? 'Header present' : 'Header NOT present');
+        console.log('Subscription payload:', JSON.stringify({
+            instruments,
+            xtsMessageCode: 1502,
+            publishFormat: 'JSON'
+        }));
+        
+        try {
+            const response = await this.client.post('/instruments/subscription', {
+                instruments,
+                xtsMessageCode: 1502, // 1502 = Market Data Touchline
+                publishFormat: 'JSON'
+            });
+            
+            console.log('Subscription response:', JSON.stringify(response.data));
+            console.log('Subscription successful');
+            return response.data;
+        } catch (error) {
+            console.error('Failed to subscribe:', error.response?.data || error.message);
+            if (error.response) {
+                console.error('Subscription error response status:', error.response.status);
+                console.error('Subscription error response headers:', JSON.stringify(error.response.headers));
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Subscribe to a single symbol (format: "segment_instrumentId")
+     * @param {string} symbol - Symbol to subscribe
+     */
+    async subscribe(symbol) {
+        const [exchangeSegment, exchangeInstrumentID] = symbol.split('_');
+        const instruments = [{
+            exchangeSegment: Number(exchangeSegment),
+            exchangeInstrumentID: Number(exchangeInstrumentID)
+        }];
+        return this.subscribeInstruments(instruments);
+    }
+
+    /**
+     * Unsubscribe from instruments
+     * @param {Array<{exchangeSegment: number, exchangeInstrumentID: number}>} instruments - Instruments to unsubscribe
+     * @returns {Promise<Object>} API response
+     */
+    async unsubscribeInstruments(instruments) {
+        if (!this.token) await this.login();
+        
+        const instrumentKeys = instruments.map(instr => `${instr.exchangeSegment}_${instr.exchangeInstrumentID}`);
+        instrumentKeys.forEach(key => this.subscribedInstruments.delete(key));
+        
+        console.log(`Unsubscribing from ${instruments.length} instruments...`);
+        
+        try {
+            const response = await this.client.put('/instruments/subscription', {
+                instruments,
+                xtsMessageCode: 1502,
+                publishFormat: 'JSON'
+            });
+            
+            console.log('Unsubscription successful');
+            return response.data;
+        } catch (error) {
+            console.error('Failed to unsubscribe:', error.response?.data || error.message);
+            throw error;
         }
     }
 

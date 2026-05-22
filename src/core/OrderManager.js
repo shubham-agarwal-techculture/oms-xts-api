@@ -314,7 +314,20 @@ class OrderManager extends EventEmitter {
         let symbol = this.normalizeSymbol(signal.symbol);
         const { quantity, position } = signal;
 
-        const currentPrice = this.resolveFillPrice(symbol);
+        // Get underlying price by resolving symbol to segment_instrumentId
+        let currentPrice = null;
+        if (this.orderExecutor.resolveInstrument) {
+            const resolved = this.orderExecutor.resolveInstrument(symbol);
+            const marketDataKey = `${resolved.exchangeSegment}_${resolved.exchangeInstrumentID}`;
+            currentPrice = this.marketData.getLastPrice(marketDataKey);
+            if (currentPrice == null) {
+                // Fallback to original resolveFillPrice if market data key not found
+                currentPrice = this.resolveFillPrice(symbol);
+            }
+        } else {
+            currentPrice = this.resolveFillPrice(symbol);
+        }
+
         let currentQty = (this.positions.get(symbol) || { qty: 0 }).qty;
         let targetQty = this.getTargetQty(position, quantity);
 

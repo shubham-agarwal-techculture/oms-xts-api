@@ -64,7 +64,16 @@ async function main() {
         
         // Load instrument masters and symbol map
         console.log('Loading instrument masters...');
-        await orderExecutor.loadSymbolMap(['NSEFO']); // Load NSEFO segment
+        await orderExecutor.loadSymbolMap(['NSECM', 'NSEFO']); // Load NSECM (spot) and NSEFO (options) segments
+
+        // Subscribe to underlying instrument (e.g., NIFTY spot - exchangeSegment=1, exchangeInstrumentID=22)
+        try {
+            await marketData.subscribeInstruments([
+                { exchangeSegment: 1, exchangeInstrumentID: 22 } // NIFTY spot
+            ]);
+        } catch (error) {
+            console.error('Failed to subscribe to underlying instrument:', error.message);
+        }
 
         signalSource.start();
         dashboard.start();

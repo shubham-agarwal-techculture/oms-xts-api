@@ -106,14 +106,14 @@ class XTSOrderExecutor extends OrderExecutor {
             };
         }
         
-        console.log(`Resolving symbol '${symbol}' to exchangeSegment ${exchangeSegment} and exchangeInstrumentID ${exchangeInstrumentID}`);
-
         // Default to NIFTY if symbol is not provided or empty
         const targetSymbol = (symbol || 'NIFTY').toUpperCase().trim();
         
         // Check if symbol exists in our mapping
         if (this.symbolMap[targetSymbol]) {
-            return this.symbolMap[targetSymbol];
+            const result = this.symbolMap[targetSymbol];
+            console.log(`Resolved symbol '${symbol}' to exchangeSegment ${result.exchangeSegment} and exchangeInstrumentID ${result.exchangeInstrumentID}`);
+            return result;
         }
         
         // Fallback: try to use as instrument ID with default segment (1 = NSE)
