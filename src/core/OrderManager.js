@@ -245,7 +245,7 @@ class OrderManager extends EventEmitter {
         });
 
         // Periodic position sync (Optional but good for dummy APIs)
-        setInterval(() => this.syncPositions(), 30000); // every 30s
+        // setInterval(() => this.syncPositions(), 30000); // every 30s
     }
 
     async syncPositions() {

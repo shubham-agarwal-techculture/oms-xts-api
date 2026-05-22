@@ -183,7 +183,7 @@ class InstrumentMasterManager {
      * @param {Array<string>} exchangeSegmentCodes - List of exchange segment codes to load
      * @returns {Promise<Object>} Symbol map { 'SYMBOL': { exchangeSegment, exchangeInstrumentID } }
      */
-    async buildSymbolMap(exchangeSegmentCodes = ['NSECM']) {
+    async buildSymbolMap(exchangeSegmentCodes = ['NSEFO']) {
         const symbolMap = {};
 
         for (const segmentCode of exchangeSegmentCodes) {

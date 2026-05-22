@@ -64,7 +64,7 @@ async function main() {
         
         // Load instrument masters and symbol map
         console.log('Loading instrument masters...');
-        await orderExecutor.loadSymbolMap(['NSECM']); // Load NSECM segment
+        await orderExecutor.loadSymbolMap(['NSEFO']); // Load NSEFO segment
 
         signalSource.start();
         dashboard.start();

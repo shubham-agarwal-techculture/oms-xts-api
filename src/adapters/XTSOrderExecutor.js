@@ -32,7 +32,7 @@ class XTSOrderExecutor extends OrderExecutor {
      * Load instrument masters and build symbol map
      * @param {Array<string>} exchangeSegmentCodes - Exchange segment codes to load
      */
-    async loadSymbolMap(exchangeSegmentCodes = ['NSECM']) {
+    async loadSymbolMap(exchangeSegmentCodes = ['NSEFO']) {
         if (this.symbolMapLoaded) {
             console.log('Symbol map already loaded');
             return;
@@ -53,12 +53,15 @@ class XTSOrderExecutor extends OrderExecutor {
         // If symbol is already in 'segment_instrumentId' format
         if (symbol && symbol.includes('_')) {
             const [exchangeSegment, exchangeInstrumentID] = symbol.split('_');
+
             return {
                 exchangeSegment: Number(exchangeSegment) || exchangeSegment,
                 exchangeInstrumentID: Number(exchangeInstrumentID) || exchangeInstrumentID
             };
         }
         
+        console.log(`Resolving symbol '${symbol}' to exchangeSegment ${exchangeSegment} and exchangeInstrumentID ${exchangeInstrumentID}`);
+
         // Default to NIFTY if symbol is not provided or empty
         const targetSymbol = (symbol || 'NIFTY').toUpperCase().trim();
         
