@@ -69,7 +69,7 @@ async function main() {
         // Subscribe to underlying instrument (e.g., NIFTY spot - exchangeSegment=1, exchangeInstrumentID=22)
         try {
             await marketData.subscribeInstruments([
-                { exchangeSegment: 1, exchangeInstrumentID: 22 } // NIFTY spot
+                { exchangeSegment: 1, exchangeInstrumentID: 26000 } // NIFTY spot
             ]);
         } catch (error) {
             console.error('Failed to subscribe to underlying instrument:', error.message);

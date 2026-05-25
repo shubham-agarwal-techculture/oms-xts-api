@@ -216,20 +216,26 @@ class XTSMarketDataAdapter extends MarketDataProvider {
     async subscribeInstruments(instruments) {
         if (!this.token) await this.login();
         
-        const instrumentKeys = instruments.map(instr => `${instr.exchangeSegment}_${instr.exchangeInstrumentID}`);
+        // Ensure numeric values for exchangeSegment and exchangeInstrumentID
+        const normalizedInstruments = instruments.map(instr => ({
+            exchangeSegment: Number(instr.exchangeSegment),
+            exchangeInstrumentID: Number(instr.exchangeInstrumentID)
+        }));
+        
+        const instrumentKeys = normalizedInstruments.map(instr => `${instr.exchangeSegment}_${instr.exchangeInstrumentID}`);
         instrumentKeys.forEach(key => this.subscribedInstruments.add(key));
         
-        console.log(`Subscribing to ${instruments.length} instruments...`);
+        console.log(`Subscribing to ${normalizedInstruments.length} instruments...`);
         console.log('Current token:', this.token ? 'Token exists (length: ' + this.token.length + ')' : 'No token');
         console.log('Authorization header in client:', this.client.defaults.headers.common['authorization'] ? 'Header present' : 'Header NOT present');
         console.log('Subscription payload:', JSON.stringify({
-            instruments,
+            instruments: normalizedInstruments,
             xtsMessageCode: 1502
         }));
         
         try {
             const response = await this.client.post('/instruments/subscription', {
-                instruments,
+                instruments: normalizedInstruments,
                 xtsMessageCode: 1502 // 1502 = Market Data Touchline
             });
             
@@ -237,6 +243,23 @@ class XTSMarketDataAdapter extends MarketDataProvider {
             console.log('Subscription successful');
             return response.data;
         } catch (error) {
+            // If token is invalid, try to re-login once
+            if (error.response?.data?.code === 'e-session-0007' || 
+                error.response?.data?.description === 'Invalid Token') {
+                console.warn('Token invalid, attempting to re-login...');
+                this.token = null;
+                await this.login();
+                // Retry the subscription once
+                console.log('Retrying subscription after re-login...');
+                const retryResponse = await this.client.post('/instruments/subscription', {
+                    instruments: normalizedInstruments,
+                    xtsMessageCode: 1502
+                });
+                console.log('Retry subscription response:', JSON.stringify(retryResponse.data));
+                console.log('Retry subscription successful');
+                return retryResponse.data;
+            }
+            
             console.error('Failed to subscribe:', error.response?.data || error.message);
             if (error.response?.data?.result?.errors) {
                 console.error('Detailed errors:', JSON.stringify(error.response.data.result.errors, null, 2));

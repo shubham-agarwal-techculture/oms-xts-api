@@ -311,37 +311,78 @@ class OrderManager extends EventEmitter {
     }
 
     async handleSignal(signal) {
+        console.log('=== OrderManager.handleSignal() CALLED ===');
+        console.log('Received signal:', JSON.stringify(signal, null, 2));
+        
         let symbol = this.normalizeSymbol(signal.symbol);
         const { quantity, position } = signal;
+
+        console.log('Processing signal for symbol:', symbol);
+        console.log('Signal details:', { quantity, position, action: signal.action });
 
         // Get underlying price by resolving symbol to segment_instrumentId
         let currentPrice = null;
         if (this.orderExecutor.resolveInstrument) {
+            console.log('Resolving instrument for market data...');
             const resolved = this.orderExecutor.resolveInstrument(symbol);
             const marketDataKey = `${resolved.exchangeSegment}_${resolved.exchangeInstrumentID}`;
+            console.log('Market data key:', marketDataKey);
             currentPrice = this.marketData.getLastPrice(marketDataKey);
             if (currentPrice == null) {
+                console.log('No price found for market data key, falling back to resolveFillPrice');
                 // Fallback to original resolveFillPrice if market data key not found
                 currentPrice = this.resolveFillPrice(symbol);
             }
         } else {
+            console.log('No resolveInstrument method, using resolveFillPrice directly');
             currentPrice = this.resolveFillPrice(symbol);
         }
+
+        console.log('Current market price:', currentPrice ?? 'N/A');
 
         let currentQty = (this.positions.get(symbol) || { qty: 0 }).qty;
         let targetQty = this.getTargetQty(position, quantity);
 
+        console.log('Position details:', { currentQty, targetQty });
+
         // Try to select OTM option if we're not squaring off
         let selectedOption = null;
         if (position !== 'flat' && this.orderExecutor.selectOTMOption) {
+            console.log('Attempting to select OTM option...');
             selectedOption = this.orderExecutor.selectOTMOption(symbol, signal.action, currentPrice);
             if (selectedOption) {
                 console.log(`Selected OTM option: ${selectedOption.tradingSymbol}`);
+                console.log('Option details:', JSON.stringify(selectedOption, null, 2));
+                
+                // Subscribe to the option instrument to get its LTP
+                try {
+                    console.log(`Subscribing to option instrument: ${selectedOption.exchangeSegment}_${selectedOption.exchangeInstrumentID}`);
+                    await this.marketData.subscribeInstruments([{
+                        exchangeSegment: selectedOption.exchangeSegment,
+                        exchangeInstrumentID: selectedOption.exchangeInstrumentID
+                    }]);
+                    console.log('Successfully subscribed to option instrument');
+                } catch (error) {
+                    console.warn('Failed to subscribe to option instrument:', error.message);
+                }
+                
                 // Update symbol to the option's trading symbol
                 symbol = selectedOption.tradingSymbol;
                 // Check position for the option instead of the underlying
                 currentQty = (this.positions.get(symbol) || { qty: 0 }).qty;
                 targetQty = this.getTargetQty(position, quantity);
+                console.log('Updated position details after option selection:', { symbol, currentQty, targetQty });
+                
+                // Now get the option's LTP instead of using underlying price
+                const optionMarketDataKey = `${selectedOption.exchangeSegment}_${selectedOption.exchangeInstrumentID}`;
+                const optionPrice = this.marketData.getLastPrice(optionMarketDataKey);
+                
+                if (optionPrice != null) {
+                    console.log(`Using option LTP (${optionPrice}) instead of underlying price (${currentPrice})`);
+                    currentPrice = optionPrice;
+                } else {
+                    console.warn(`Option LTP not available yet, still using underlying price (${currentPrice}) as fallback`);
+                }
             } else {
                 console.warn(`Failed to select option for ${symbol}, using underlying directly`);
             }
@@ -379,10 +420,23 @@ class OrderManager extends EventEmitter {
         const action = delta > 0 ? 'BUY' : 'SELL';
         const orderQty = Math.abs(delta);
 
+        console.log('=== PREPARING TO PLACE ORDER ===');
+        console.log('Order details:', {
+            symbol,
+            action,
+            quantity: orderQty,
+            orderType: signal.orderType || 'LIMIT',
+            limitPrice: signal.limitPrice || currentPrice,
+            productType: signal.productType || 'MIS',
+            instrumentType: signal.instrumentType
+        });
+        console.log('=================================');
+
         try {
             // Use current market price as limit price if not provided for LIMIT orders
             const resolvedLimitPrice = signal.limitPrice || currentPrice;
             
+            console.log('Calling orderExecutor.placeOrder()...');
             const result = await this.orderExecutor.placeOrder({
                 symbol,
                 action,

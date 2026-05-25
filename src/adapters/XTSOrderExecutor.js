@@ -136,14 +136,28 @@ class XTSOrderExecutor extends OrderExecutor {
         this.userID = data?.result?.userID;
 
         if (!this.token) throw new Error('Interactive Login failed');
+        // Set both authorization and token headers as required by XTS API
         this.client.defaults.headers.common['authorization'] = this.token;
+        this.client.defaults.headers.common['token'] = this.token;
+        console.log('Set authorization header (raw):', this.client.defaults.headers.common['authorization'] ? 'Header set' : 'Header NOT set');
+        console.log('Set token header:', this.client.defaults.headers.common['token'] ? 'Header set' : 'Header NOT set');
         console.log('Interactive Login successful');
     }
 
     async placeOrder(orderDetails) {
-        if (!this.token) await this.login();
+        console.log('=== XTSOrderExecutor.placeOrder() CALLED ===');
+        console.log('Input orderDetails:', JSON.stringify(orderDetails, null, 2));
+        
+        if (!this.token) {
+            console.log('Token not available, logging in first...');
+            await this.login();
+        } else {
+            console.log('Token already available (length:', this.token.length + ')');
+        }
 
+        console.log('Resolving instrument for symbol:', orderDetails.symbol);
         const { exchangeSegment, exchangeInstrumentID } = this.resolveInstrument(orderDetails.symbol);
+        console.log('Resolved instrument:', { exchangeSegment, exchangeInstrumentID });
 
         const payload = {
             exchangeSegment: Number(exchangeSegment) || exchangeSegment,
@@ -164,14 +178,32 @@ class XTSOrderExecutor extends OrderExecutor {
             clientOrderID: `OMS_${Date.now()}`
         };
 
-        console.log(`Payload: ${JSON.stringify(payload)}`);
+        console.log('=== ORDER PAYLOAD READY TO SEND TO XTS API ===');
+        console.log(JSON.stringify(payload, null, 2));
+        console.log('==============================================');
 
         try {
-            console.log(`Placing ${orderDetails.orderType || 'LIMIT'} order: ${orderDetails.action} ${orderDetails.quantity} for ${orderDetails.symbol}`);
+            console.log(`Placing ${orderDetails.orderType || 'LIMIT'} order: ${orderDetails.action} ${orderDetails.quantity} for ${orderDetails.symbol} (instrument: ${exchangeSegment}_${exchangeInstrumentID})`);
+            console.log('Sending POST request to:', this.config.baseUrl + '/interactive/orders');
+            
             const response = await this.client.post('/interactive/orders', payload);
+            
+            console.log('=== XTS API RESPONSE RECEIVED ===');
+            console.log('Response status:', response.status);
+            console.log('Response data:', JSON.stringify(response.data, null, 2));
+            console.log('=================================');
+            
             return response.data;
         } catch (error) {
-            console.error('Order placement failed:', error.response?.data || error.message);
+            console.error('=== XTS API ORDER PLACEMENT FAILED ===');
+            console.error('Error message:', error.message);
+            if (error.response) {
+                console.error('Response status:', error.response.status);
+                console.error('Response statusText:', error.response.statusText);
+                console.error('Response data:', JSON.stringify(error.response.data, null, 2));
+                console.error('Response headers:', JSON.stringify(error.response.headers, null, 2));
+            }
+            console.error('======================================');
             throw error;
         }
     }
@@ -197,8 +229,19 @@ class XTSOrderExecutor extends OrderExecutor {
     }
 
     async squareOffPosition(details) {
-        if (!this.token) await this.login();
+        console.log('=== XTSOrderExecutor.squareOffPosition() CALLED ===');
+        console.log('Input details:', JSON.stringify(details, null, 2));
+        
+        if (!this.token) {
+            console.log('Token not available, logging in first...');
+            await this.login();
+        } else {
+            console.log('Token already available (length:', this.token.length + ')');
+        }
+
+        console.log('Resolving instrument for symbol:', details.symbol);
         const { exchangeSegment, exchangeInstrumentID } = this.resolveInstrument(details.symbol);
+        console.log('Resolved instrument:', { exchangeSegment, exchangeInstrumentID });
 
         const payload = {
             exchangeSegment: Number(exchangeSegment) || exchangeSegment,
@@ -208,9 +251,33 @@ class XTSOrderExecutor extends OrderExecutor {
             orderQuantity: details.quantity
         };
 
-        console.log(`Squaring off position: ${details.symbol} (${details.quantity})`);
-        const response = await this.client.post('/interactive/positions/squareoff', payload);
-        return response.data;
+        console.log('=== SQUARE-OFF PAYLOAD READY TO SEND TO XTS API ===');
+        console.log(JSON.stringify(payload, null, 2));
+        console.log('================================================');
+
+        try {
+            console.log(`Squaring off position: ${details.symbol} (${details.quantity}) for instrument ${exchangeSegment}_${exchangeInstrumentID}`);
+            console.log('Sending POST request to:', this.config.baseUrl + '/interactive/positions/squareoff');
+            
+            const response = await this.client.post('/interactive/positions/squareoff', payload);
+            
+            console.log('=== XTS API SQUARE-OFF RESPONSE RECEIVED ===');
+            console.log('Response status:', response.status);
+            console.log('Response data:', JSON.stringify(response.data, null, 2));
+            console.log('=========================================');
+            
+            return response.data;
+        } catch (error) {
+            console.error('=== XTS API SQUARE-OFF FAILED ===');
+            console.error('Error message:', error.message);
+            if (error.response) {
+                console.error('Response status:', error.response.status);
+                console.error('Response statusText:', error.response.statusText);
+                console.error('Response data:', JSON.stringify(error.response.data, null, 2));
+            }
+            console.error('=================================');
+            throw error;
+        }
     }
 }
 

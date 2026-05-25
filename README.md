@@ -125,7 +125,9 @@ On startup the OMS connects market data, starts the signal receiver (default por
 
 ---
 
-## Quick Start (Mock Mode)
+## Quick Start
+
+### Quick Start (Mock Mode)
 
 Run end-to-end without a broker or live market data:
 
@@ -161,6 +163,50 @@ curl -X POST http://localhost:5001/signal \
 ```
 
 Example payloads are also in `scratch/signal.json` and `scratch/flat_signal.json`.
+
+### Quick Start (XTS Mode with Test Script)
+
+For XTS mode with the provided test script:
+
+1. Ensure your `.env` file has valid XTS credentials
+2. Start the OMS:
+   ```bash
+   node index.js
+   ```
+3. In a separate terminal, run the test signal:
+   ```bash
+   node test-signal.js
+   ```
+
+The `test-signal.js` script sends a MARKET order for NIFTY with position=long.
+
+---
+
+## Recent Improvements & Fixes
+
+### Instrument Master Management Fixes (2026-05-25)
+
+- **Fixed `exchangeInstrumentID` numeric parsing** - Now properly parsed as integer instead of string
+- **Spot instrument prioritization** - NSECM (spot) instruments now take priority over NSEFO (options) in symbol map
+- **Token refresh mechanism** - Automatic re-login and retry on "Invalid Token" errors
+- **Numeric value normalization** - All instrument subscriptions guarantee numeric `exchangeSegment` and `exchangeInstrumentID`
+- **Comprehensive logging** - Detailed order flow logging before sending to XTS API
+- **Option price usage** - After selecting OTM option, subscribes to option instrument and uses its LTP instead of underlying price
+
+### Troubleshooting
+
+If you encounter issues with instrument masters:
+
+1. **Delete old master files**:
+   ```powershell
+   Remove-Item -Path "data\masters\instrument_master_*.json" -Force
+   ```
+2. **Restart the application** - Fresh instrument masters will be downloaded with fixes
+
+This ensures:
+- Numeric instrument IDs (not strings)
+- Spot instruments prioritize over options
+- Fresh symbol map with correct mappings
 
 ---
 

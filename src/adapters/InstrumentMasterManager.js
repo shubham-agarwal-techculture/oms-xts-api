@@ -114,7 +114,7 @@ class InstrumentMasterManager {
                     instrumentType: parts[0],
                     
                     // Field 1: Exchange Instrument ID
-                    exchangeInstrumentID: parts[1],
+                    exchangeInstrumentID: parts[1] ? parseInt(parts[1], 10) : null,
                     
                     // Field 2: ?
                     field2: parts[2],
@@ -264,15 +264,29 @@ class InstrumentMasterManager {
     async buildSymbolMap(exchangeSegmentCodes = ['NSEFO']) {
         const symbolMap = {};
 
-        for (const segmentCode of exchangeSegmentCodes) {
+        // Process NSECM (spot) FIRST to prioritize spot instruments
+        const processedSegments = new Set();
+        
+        // Always process NSECM first if it's in the list
+        const sortedSegments = [...exchangeSegmentCodes].sort((a, b) => {
+            if (a === 'NSECM') return -1;
+            if (b === 'NSECM') return 1;
+            return 0;
+        });
+
+        for (const segmentCode of sortedSegments) {
+            if (processedSegments.has(segmentCode)) continue;
+            processedSegments.add(segmentCode);
+            
             try {
                 const instruments = await this.loadMaster(segmentCode);
+                const isSpotSegment = segmentCode === 'NSECM';
                 
                 instruments.forEach(inst => {
-                    // Add symbol
+                    // Add symbol - spot instruments take priority
                     if (inst.symbol) {
                         const symbolKey = String(inst.symbol).toUpperCase().trim();
-                        if (symbolKey && !symbolMap[symbolKey]) {
+                        if (symbolKey && (!symbolMap[symbolKey] || isSpotSegment)) {
                             symbolMap[symbolKey] = {
                                 exchangeSegment: inst.exchangeSegment,
                                 exchangeInstrumentID: inst.exchangeInstrumentID
