@@ -11,7 +11,7 @@ class XTSMarketDataAdapter extends MarketDataProvider {
         this.config = config;
         this.socket = null;
         this.token = null;
-        this.userID = null;k
+        this.userID = null;
         this.lastPrices = new Map();
         this.lastSymbol = null;
         this.events = new EventEmitter();
@@ -237,6 +237,8 @@ class XTSMarketDataAdapter extends MarketDataProvider {
             const response = await this.client.post('/instruments/subscription', {
                 instruments: normalizedInstruments,
                 xtsMessageCode: 1502 // 1502 = Market Data Touchline
+                // xtsMessageCode: 1501// 1501 = Market Data Touchline
+
             });
             
             console.log('Subscription response:', JSON.stringify(response.data));
@@ -254,6 +256,7 @@ class XTSMarketDataAdapter extends MarketDataProvider {
                 const retryResponse = await this.client.post('/instruments/subscription', {
                     instruments: normalizedInstruments,
                     xtsMessageCode: 1502
+                    // xtsMessageCode: 1501// 1501 = Market Data Touchline
                 });
                 console.log('Retry subscription response:', JSON.stringify(retryResponse.data));
                 console.log('Retry subscription successful');
@@ -302,6 +305,7 @@ class XTSMarketDataAdapter extends MarketDataProvider {
             const response = await this.client.put('/instruments/subscription', {
                 instruments,
                 xtsMessageCode: 1502
+                // xtsMessageCode: 1501// 1501 = Market Data Touchline
             });
             
             console.log('Unsubscription successful');
@@ -313,6 +317,7 @@ class XTSMarketDataAdapter extends MarketDataProvider {
     }
 
     getLastPrice(symbol) {
+        console.log("last price: ", this.lastPrices);
         const targetSymbol = symbol || this.lastSymbol;
         if (targetSymbol) {
             const direct = this.lastPrices.get(targetSymbol);

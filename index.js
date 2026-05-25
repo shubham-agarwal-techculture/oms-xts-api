@@ -66,7 +66,7 @@ async function main() {
         console.log('Loading instrument masters...');
         await orderExecutor.loadSymbolMap(['NSECM', 'NSEFO']); // Load NSECM (spot) and NSEFO (options) segments
 
-        // Subscribe to underlying instrument (e.g., NIFTY spot - exchangeSegment=1, exchangeInstrumentID=22)
+        // Subscribe to underlying instrument (e.g., NIFTY spot - exchangeSegment=1, exchangeInstrumentID=26000)
         try {
             await marketData.subscribeInstruments([
                 { exchangeSegment: 1, exchangeInstrumentID: 26000 } // NIFTY spot
