@@ -24,7 +24,7 @@ class RESTSignalReceiver extends SignalSource {
                 });
             }
 
-            console.log(`Received signal: ${action} ${quantity} for ${symbol || 'default'} (Position: ${position || 'N/A'})`);
+            console.log(`Received signal: ${action} ${quantity} for ${symbol || 'NIFTY'} (Position: ${position || 'N/A'})`);
 
             const { orderType, limitPrice, productType, instrumentType } = req.body;
             this.events.emit('signal', {
