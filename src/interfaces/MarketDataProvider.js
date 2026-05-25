@@ -33,6 +33,15 @@ class MarketDataProvider {
     getLastPrice(symbol) {
         throw new Error("Method 'getLastPrice()' must be implemented");
     }
+
+    /**
+     * Fetch the last traded price (LTP) for a symbol.
+     * @param {string} symbol 
+     * @returns {Promise<number|null>}
+     */
+    async fetchLTP(symbol) {
+        return this.getLastPrice(symbol);
+    }
 }
 
 module.exports = MarketDataProvider;

@@ -5,6 +5,8 @@ const axios = require('axios');
 const https = require('https');
 const EventEmitter = require('events');
 
+const TAG = '[MarketData]';
+
 class XTSMarketDataAdapter extends MarketDataProvider {
     constructor(config) {
         super();
@@ -16,79 +18,35 @@ class XTSMarketDataAdapter extends MarketDataProvider {
         this.lastSymbol = null;
         this.events = new EventEmitter();
         this.subscribedInstruments = new Set();
-        // Create axios client for REST API calls
         this.client = axios.create({
             baseURL: config.baseUrl,
             headers: { 'Content-Type': 'application/json' },
             httpsAgent: new https.Agent({ rejectUnauthorized: false })
         });
-
-        // Add request interceptor to log outgoing requests
-        this.client.interceptors.request.use(request => {
-            console.log('Outgoing Request:', {
-                method: request.method?.toUpperCase(),
-                url: request.baseURL + request.url,
-                headers: request.headers
-            });
-            return request;
-        }, error => {
-            console.error('Request Error:', error);
-            return Promise.reject(error);
-        });
-
-        // Add response interceptor to log incoming responses
-        this.client.interceptors.response.use(response => {
-            console.log('Incoming Response:', {
-                status: response.status,
-                statusText: response.statusText,
-                data: response.data
-            });
-            return response;
-        }, error => {
-            console.error('Response Error:', {
-                status: error.response?.status,
-                statusText: error.response?.statusText,
-                data: error.response?.data
-            });
-            return Promise.reject(error);
-        });
     }
 
     async login() {
         if (this.config.baseUrl.startsWith('ws://') || this.config.baseUrl.startsWith('wss://')) {
-            console.log('Skipping login for raw WebSocket dummy data');
-            return;
+            return; // raw WebSocket — no login needed
         }
-        
-        console.log('Logging in to XTS Market Data...');
+
+        console.log(`${TAG} Logging in...`);
         try {
             const response = await this.client.post('/auth/login', {
                 appKey: this.config.appKey,
                 secretKey: this.config.secretKey
             });
 
-            console.log('Login response data:', JSON.stringify(response.data));
             const data = Array.isArray(response.data) ? response.data[0] : response.data;
-            console.log('Parsed login data:', JSON.stringify(data));
             this.token = data?.result?.token;
             this.userID = data?.result?.userID;
-            
-            console.log('Extracted token:', this.token ? 'Token received (length: ' + this.token.length + ')' : 'No token');
-            console.log('Extracted userID:', this.userID);
-            
+
             if (!this.token) throw new Error('Login failed: Token not received');
-            // Set both authorization and token headers as required by XTS API
             this.client.defaults.headers.common['authorization'] = this.token;
             this.client.defaults.headers.common['token'] = this.token;
-            console.log('Set authorization header (raw):', this.client.defaults.headers.common['authorization'] ? 'Header set' : 'Header NOT set');
-            console.log('Set token header:', this.client.defaults.headers.common['token'] ? 'Header set' : 'Header NOT set');
-            console.log('Market Data login successful');
+            console.log(`${TAG} Login successful (userID: ${this.userID})`);
         } catch (error) {
-            console.error('Market Data Login failed:', error.response?.data || error.message);
-            if (error.response) {
-                console.error('Login error response status:', error.response.status);
-                console.error('Login error response headers:', JSON.stringify(error.response.headers));
-            }
+            console.error(`${TAG} Login failed:`, error.response?.data?.description || error.message);
             throw error;
         }
     }
@@ -105,7 +63,7 @@ class XTSMarketDataAdapter extends MarketDataProvider {
         const baseUrl = url.origin;
         const socketPath = url.pathname === '/' ? '/socket.io' : `${url.pathname}/socket.io`;
 
-        console.log(`Connecting to XTS Socket.io at ${baseUrl} with path ${socketPath}`);
+        console.log(`${TAG} Connecting to Socket.io at ${baseUrl}${socketPath}`);
         this.socket = ioClient(baseUrl, {
             path: socketPath,
             query: {
@@ -124,68 +82,50 @@ class XTSMarketDataAdapter extends MarketDataProvider {
     }
 
     connectRawWebSocket() {
-        console.log(`Connecting to raw WebSocket at ${this.config.baseUrl}`);
+        console.log(`${TAG} Connecting to raw WebSocket at ${this.config.baseUrl}`);
         this.socket = new WebSocket(this.config.baseUrl);
 
-        this.socket.on('open', () => {
-            console.log('Raw Market Data WebSocket connected');
-        });
-
+        this.socket.on('open', () => console.log(`${TAG} WebSocket connected`));
         this.socket.on('message', (data) => {
             try {
-                const message = data.toString();
-                // Check if it's JSON or other format. Assuming JSON for dummy.
-                const parsed = JSON.parse(message);
-                this.handleMarketData(parsed);
-            } catch (error) {
-                // Ignore non-JSON messages or handle accordingly
+                this.handleMarketData(JSON.parse(data.toString()));
+            } catch (_) {
+                // Ignore non-JSON frames
             }
         });
-
-        this.socket.on('error', (err) => console.error('Raw WebSocket Error:', err));
-        this.socket.on('close', () => console.log('Raw WebSocket closed'));
+        this.socket.on('error', (err) => console.error(`${TAG} WebSocket error:`, err.message));
+        this.socket.on('close', () => console.log(`${TAG} WebSocket closed`));
     }
 
     setupSocketIOEvents() {
         this.socket.on('connect', () => {
-            console.log('XTS Market Data (Socket.io) connected');
+            console.log(`${TAG} Socket.io connected`);
             this.events.emit('connected');
         });
 
         this.socket.on('disconnect', (reason) => {
-            console.log('XTS Market Data (Socket.io) disconnected:', reason);
+            console.log(`${TAG} Socket.io disconnected:`, reason);
             this.events.emit('disconnected', reason);
         });
 
-        // Try both possible event names (fixing possible typo 'fkull' → 'full')
-        this.socket.on('1502-json-full', (data) => {
+        // Handle both known event names (server-side typo 'fkull' vs 'full')
+        const onTick = (data) => {
             try {
-                const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-                this.handleMarketData(parsed);
+                this.handleMarketData(typeof data === 'string' ? JSON.parse(data) : data);
             } catch (error) {
-                console.error('Failed to parse Socket.io message (1502-json-full):', error.message);
+                console.error(`${TAG} Failed to parse tick:`, error.message);
             }
-        });
-
-        this.socket.on('1502-json-fkull', (data) => {
-            try {
-                const parsed = typeof data === 'string' ? JSON.parse(data) : data;
-                this.handleMarketData(parsed);
-            } catch (error) {
-                console.error('Failed to parse Socket.io message (1502-json-fkull):', error.message);
-            }
-        });
+        };
+        this.socket.on('1502-json-full', onTick);
+        this.socket.on('1502-json-fkull', onTick);
 
         this.socket.on('error', (err) => {
-            console.error('Socket.io Error:', err);
+            console.error(`${TAG} Socket.io error:`, err);
             this.events.emit('error', err);
         });
     }
 
     handleMarketData(parsed) {
-        // console.debug('Market data received:', JSON.stringify(parsed));
-        // Handle XTS format: parsed.Touchline.LastTradedPrice
-        // or a flatter dummy format: parsed.LastTradedPrice
         const defaultSymbol = process.env.DEFAULT_SYMBOL || '1_22';
         const isDummy = this.config.baseUrl.startsWith('ws://') || this.config.baseUrl.startsWith('wss://');
         const symbol = isDummy
@@ -194,134 +134,108 @@ class XTSMarketDataAdapter extends MarketDataProvider {
                 ? `${parsed.ExchangeSegment}_${parsed.ExchangeInstrumentID}`
                 : defaultSymbol));
         const price = parsed.price || parsed.Touchline?.LastTradedPrice || parsed.LastTradedPrice || parsed.close || parsed.last;
-        
+
         if (price) {
             this.lastPrices.set(symbol, price);
             this.lastSymbol = symbol;
-            this.events.emit('priceUpdate', { 
-                symbol, 
-                price, 
-                timestamp: parsed.timestamp || parsed.ExchangeTransmitTime || Date.now() 
+            this.events.emit('priceUpdate', {
+                symbol,
+                price,
+                timestamp: parsed.timestamp || parsed.ExchangeTransmitTime || Date.now()
             });
         } else {
-            console.warn('Market data missing price:', { symbol, price, parsed });
+            console.warn(`${TAG} Tick missing price for ${symbol}`);
         }
     }
 
     /**
-     * Subscribe to instruments for market data
-     * @param {Array<{exchangeSegment: number, exchangeInstrumentID: number}>} instruments - Instruments to subscribe
-     * @returns {Promise<Object>} API response
+     * Subscribe to instruments for real-time market data.
+     * @param {Array<{exchangeSegment: number, exchangeInstrumentID: number}>} instruments
      */
     async subscribeInstruments(instruments) {
         if (!this.token) await this.login();
-        
-        // Ensure numeric values for exchangeSegment and exchangeInstrumentID
+
         const normalizedInstruments = instruments.map(instr => ({
             exchangeSegment: Number(instr.exchangeSegment),
             exchangeInstrumentID: Number(instr.exchangeInstrumentID)
         }));
-        
-        const instrumentKeys = normalizedInstruments.map(instr => `${instr.exchangeSegment}_${instr.exchangeInstrumentID}`);
-        instrumentKeys.forEach(key => this.subscribedInstruments.add(key));
-        
-        console.log(`Subscribing to ${normalizedInstruments.length} instruments...`);
-        console.log('Current token:', this.token ? 'Token exists (length: ' + this.token.length + ')' : 'No token');
-        console.log('Authorization header in client:', this.client.defaults.headers.common['authorization'] ? 'Header present' : 'Header NOT present');
-        console.log('Subscription payload:', JSON.stringify({
-            instruments: normalizedInstruments,
-            xtsMessageCode: 1502
-        }));
-        
+
+        normalizedInstruments
+            .map(i => `${i.exchangeSegment}_${i.exchangeInstrumentID}`)
+            .forEach(key => this.subscribedInstruments.add(key));
+
         try {
             const response = await this.client.post('/instruments/subscription', {
                 instruments: normalizedInstruments,
-                xtsMessageCode: 1502 // 1502 = Market Data Touchline
-                // xtsMessageCode: 1501// 1501 = Market Data Touchline
-
+                xtsMessageCode: 1502
             });
-            
-            console.log('Subscription response:', JSON.stringify(response.data));
-            console.log('Subscription successful');
+            const keys = normalizedInstruments.map(i => `${i.exchangeSegment}_${i.exchangeInstrumentID}`).join(', ');
+            console.log(`${TAG} Subscribed: [${keys}]`);
             return response.data;
         } catch (error) {
-            // If token is invalid, try to re-login once
-            if (error.response?.data?.code === 'e-session-0007' || 
+            // Token expired — re-login once and retry
+            if (error.response?.data?.code === 'e-session-0007' ||
                 error.response?.data?.description === 'Invalid Token') {
-                console.warn('Token invalid, attempting to re-login...');
+                console.warn(`${TAG} Token expired, re-logging in...`);
                 this.token = null;
                 await this.login();
-                // Retry the subscription once
-                console.log('Retrying subscription after re-login...');
                 const retryResponse = await this.client.post('/instruments/subscription', {
                     instruments: normalizedInstruments,
                     xtsMessageCode: 1502
-                    // xtsMessageCode: 1501// 1501 = Market Data Touchline
                 });
-                console.log('Retry subscription response:', JSON.stringify(retryResponse.data));
-                console.log('Retry subscription successful');
+                console.log(`${TAG} Subscribed after re-login`);
                 return retryResponse.data;
             }
-            
-            console.error('Failed to subscribe:', error.response?.data || error.message);
+
+            console.error(`${TAG} Subscription failed:`, error.response?.data?.description || error.message);
             if (error.response?.data?.result?.errors) {
-                console.error('Detailed errors:', JSON.stringify(error.response.data.result.errors, null, 2));
-            }
-            if (error.response) {
-                console.error('Subscription error response status:', error.response.status);
-                console.error('Subscription error response headers:', JSON.stringify(error.response.headers));
+                console.error(`${TAG} Errors:`, error.response.data.result.errors);
             }
             throw error;
         }
     }
 
     /**
-     * Subscribe to a single symbol (format: "segment_instrumentId")
-     * @param {string} symbol - Symbol to subscribe
+     * Subscribe to a single symbol string (format: "segment_instrumentId").
      */
     async subscribe(symbol) {
         const [exchangeSegment, exchangeInstrumentID] = symbol.split('_');
-        const instruments = [{
+        return this.subscribeInstruments([{
             exchangeSegment: Number(exchangeSegment),
             exchangeInstrumentID: Number(exchangeInstrumentID)
-        }];
-        return this.subscribeInstruments(instruments);
+        }]);
     }
 
     /**
-     * Unsubscribe from instruments
-     * @param {Array<{exchangeSegment: number, exchangeInstrumentID: number}>} instruments - Instruments to unsubscribe
-     * @returns {Promise<Object>} API response
+     * Unsubscribe from instruments.
+     * @param {Array<{exchangeSegment: number, exchangeInstrumentID: number}>} instruments
      */
     async unsubscribeInstruments(instruments) {
         if (!this.token) await this.login();
-        
-        const instrumentKeys = instruments.map(instr => `${instr.exchangeSegment}_${instr.exchangeInstrumentID}`);
-        instrumentKeys.forEach(key => this.subscribedInstruments.delete(key));
-        
-        console.log(`Unsubscribing from ${instruments.length} instruments...`);
-        
+
+        instruments
+            .map(i => `${i.exchangeSegment}_${i.exchangeInstrumentID}`)
+            .forEach(key => this.subscribedInstruments.delete(key));
+
         try {
             const response = await this.client.put('/instruments/subscription', {
                 instruments,
                 xtsMessageCode: 1502
-                // xtsMessageCode: 1501// 1501 = Market Data Touchline
             });
-            
-            console.log('Unsubscription successful');
+            console.log(`${TAG} Unsubscribed ${instruments.length} instrument(s)`);
             return response.data;
         } catch (error) {
-            console.error('Failed to unsubscribe:', error.response?.data || error.message);
+            console.error(`${TAG} Unsubscribe failed:`, error.response?.data?.description || error.message);
             throw error;
         }
     }
 
     getLastPrice(symbol) {
-        console.log("last price: ", this.lastPrices);
         const targetSymbol = symbol || this.lastSymbol;
         if (targetSymbol) {
             const direct = this.lastPrices.get(targetSymbol);
             if (Number.isFinite(direct) && direct > 0) return direct;
+            if (symbol) return null; // Specific symbol not found — don't bleed another symbol's price
         }
         if (this.lastPrices.size > 0) {
             for (const v of this.lastPrices.values()) {
@@ -330,6 +244,79 @@ class XTSMarketDataAdapter extends MarketDataProvider {
             }
         }
         return null;
+    }
+
+    /**
+     * Fetch quotes for instruments via HTTP REST (POST /instruments/quotes).
+     * @param {Array<{exchangeSegment: number, exchangeInstrumentID: number}>} instruments
+     */
+    async getQuotes(instruments) {
+        if (!this.token) await this.login();
+
+        const normalizedInstruments = instruments.map(instr => ({
+            exchangeSegment: Number(instr.exchangeSegment),
+            exchangeInstrumentID: Number(instr.exchangeInstrumentID)
+        }));
+
+        try {
+            const response = await this.client.post('/instruments/quotes', {
+                instruments: normalizedInstruments,
+                xtsMessageCode: 1512,
+                publishFormat: 'JSON'
+            });
+            return response.data;
+        } catch (error) {
+            console.error(`${TAG} getQuotes failed:`, error.response?.data?.description || error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Fetch LTP for a symbol via HTTP REST when no WebSocket tick exists yet.
+     * Caches the result in lastPrices.
+     * @param {string} symbol - Format: "segment_instrumentId" (e.g. "1_26000")
+     * @returns {Promise<number|null>}
+     */
+    async fetchLTP(symbol) {
+        if (!symbol) return null;
+
+        // Dummy WebSocket mode — no REST endpoint available
+        const isDummy = this.config.baseUrl && (this.config.baseUrl.startsWith('ws://') || this.config.baseUrl.startsWith('wss://'));
+        if (isDummy) return this.getLastPrice(symbol);
+
+        const [exchangeSegment, exchangeInstrumentID] = symbol.split('_');
+        if (!exchangeSegment || !exchangeInstrumentID) {
+            console.warn(`${TAG} fetchLTP: invalid symbol format "${symbol}"`);
+            return null;
+        }
+
+        try {
+            console.log(`${TAG} Fetching LTP via HTTP for ${symbol}`);
+            const response = await this.getQuotes([{
+                exchangeSegment: Number(exchangeSegment),
+                exchangeInstrumentID: Number(exchangeInstrumentID)
+            }]);
+
+            const listQuotes = response?.result?.listQuotes || [];
+            for (const quoteStr of listQuotes) {
+                const q = typeof quoteStr === 'string' ? (() => { try { return JSON.parse(quoteStr); } catch { return null; } })() : quoteStr;
+                if (!q) continue;
+                const price = q.LastTradedPrice ?? q.LTP ?? q.LastPrice;
+                const numPrice = Number(price);
+                if (Number.isFinite(numPrice) && numPrice > 0) {
+                    this.lastPrices.set(symbol, numPrice);
+                    this.lastSymbol = symbol;
+                    console.log(`${TAG} LTP for ${symbol}: ${numPrice}`);
+                    return numPrice;
+                }
+            }
+
+            console.warn(`${TAG} fetchLTP: no valid price in response for ${symbol}`);
+            return null;
+        } catch (error) {
+            console.error(`${TAG} fetchLTP failed for ${symbol}:`, error.message);
+            return null;
+        }
     }
 
     getActiveSymbol() {

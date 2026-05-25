@@ -1,11 +1,11 @@
 const axios = require('axios');
 
 const testSignal = {
-    symbol: 'wipro',
-    action: 'BUY',
+    symbol: 'COALINDIA',
+    action: 'sell',
     quantity: 1,
     position: 'long',
-    orderType: 'MARKET',
+    orderType: 'limit',
     productType: 'MIS'
 };
 

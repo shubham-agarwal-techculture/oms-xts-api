@@ -2,6 +2,8 @@ const EventEmitter = require('events');
 const path = require('path');
 const OmsStateStore = require('./OmsStateStore');
 
+const TAG = '[OrderManager]';
+
 class OrderManager extends EventEmitter {
     /**
      * @param {Object} options
@@ -31,14 +33,8 @@ class OrderManager extends EventEmitter {
     _registerShutdownFlush() {
         if (!this.stateStore) return;
         const flush = () => this.stateStore.flushSync(() => this.getPersistSnapshot());
-        process.once('SIGINT', () => {
-            flush();
-            process.exit(0);
-        });
-        process.once('SIGTERM', () => {
-            flush();
-            process.exit(0);
-        });
+        process.once('SIGINT', () => { flush(); process.exit(0); });
+        process.once('SIGTERM', () => { flush(); process.exit(0); });
         process.once('beforeExit', flush);
     }
 
@@ -62,17 +58,11 @@ class OrderManager extends EventEmitter {
         if (!this.stateStore) return;
         const data = this.stateStore.load();
         if (!data || data.version !== 1) {
-            if (data) {
-                console.warn('[OrderManager] Ignoring unknown or invalid state file version');
-            }
+            if (data) console.warn(`${TAG} Ignoring unknown state file version`);
             return;
         }
-        if (Array.isArray(data.orders)) {
-            this.orders = data.orders.slice(-this.maxPersistedItems);
-        }
-        if (Array.isArray(data.alerts)) {
-            this.alerts = data.alerts.slice(-this.maxPersistedItems);
-        }
+        if (Array.isArray(data.orders)) this.orders = data.orders.slice(-this.maxPersistedItems);
+        if (Array.isArray(data.alerts)) this.alerts = data.alerts.slice(-this.maxPersistedItems);
         if (Array.isArray(data.historicalPositions)) {
             this.historicalPositions = data.historicalPositions.slice(-this.maxPersistedItems);
         }
@@ -97,8 +87,8 @@ class OrderManager extends EventEmitter {
             }
         }
         console.log(
-            `[OrderManager] Restored state: ${this.orders.length} orders, ${this.alerts.length} alerts, ` +
-                `${this.positions.size} positions, ${this.historicalPositions.length} history entries`
+            `${TAG} State restored — orders: ${this.orders.length}, alerts: ${this.alerts.length}, ` +
+            `positions: ${this.positions.size}, history: ${this.historicalPositions.length}`
         );
     }
 
@@ -109,7 +99,7 @@ class OrderManager extends EventEmitter {
 
     getTargetQty(position, quantity) {
         const qty = Number(quantity) || 0;
-        if (position === 'long') return qty;
+        if (position === 'long')  return qty;
         if (position === 'short') return -qty;
         return 0;
     }
@@ -121,24 +111,17 @@ class OrderManager extends EventEmitter {
     }
 
     /**
-     * Try to read a fill / last traded price from broker order response.
-     * @param {object} result top-level API response (often { type, result })
+     * Try to extract the fill / average trade price from a broker order response.
+     * @param {object} result
      * @returns {number|null}
      */
     extractFillPriceFromOrderResult(result) {
         const r = result && typeof result === 'object' ? (result.result ?? result) : null;
         if (!r || typeof r !== 'object') return null;
         const keys = [
-            'OrderAverageTradedPrice',
-            'AverageTradedPrice',
-            'AverageTradePrice',
-            'TradedPrice',
-            'LastTradedPrice',
-            'LastPrice',
-            'LTP',
-            'OrderPrice',
-            'LimitPrice',
-            'Price'
+            'OrderAverageTradedPrice', 'AverageTradedPrice', 'AverageTradePrice',
+            'TradedPrice', 'LastTradedPrice', 'LastPrice', 'LTP',
+            'OrderPrice', 'LimitPrice', 'Price'
         ];
         for (const k of keys) {
             const n = Number(r[k]);
@@ -148,7 +131,7 @@ class OrderManager extends EventEmitter {
     }
 
     /**
-     * Best-effort last price for PnL / avg entry (handles cold start before first tick).
+     * Best-effort last price for a symbol from market data (handles cold start).
      * @param {string} symbol
      * @returns {number|null}
      */
@@ -183,7 +166,7 @@ class OrderManager extends EventEmitter {
     }
 
     /**
-     * When avg was unknown at fill time, set avg from first usable LTP for that symbol.
+     * When avg was unknown at fill time, repair it from the first usable LTP.
      */
     repairPositionsWithUnknownAvg(symbol, price) {
         const p = Number(price);
@@ -205,19 +188,17 @@ class OrderManager extends EventEmitter {
             this.emit('positionUpdate', this.getPosition(sym));
         }
 
-        if (changed) {
-            this.schedulePersist();
-        }
+        if (changed) this.schedulePersist();
     }
 
     init() {
-        console.log('Initializing Order Manager...');
+        console.log(`${TAG} Initializing...`);
         this.loadPersistedState();
+
+        // Repair any positions missing avg price from market data on startup
         for (const sym of this.positions.keys()) {
             const p = this.resolveFillPrice(sym);
-            if (p != null) {
-                this.repairPositionsWithUnknownAvg(sym, p);
-            }
+            if (p != null) this.repairPositionsWithUnknownAvg(sym, p);
         }
 
         // Listen for signals
@@ -225,10 +206,7 @@ class OrderManager extends EventEmitter {
             const activeSymbol = typeof this.marketData.getActiveSymbol === 'function'
                 ? this.marketData.getActiveSymbol()
                 : null;
-            // If no symbol in signal, use active symbol or default to 'NIFTY'
             signal.symbol = this.normalizeSymbol(signal.symbol || activeSymbol || 'NIFTY');
-            console.log(`Resolved symbol ${signal.symbol} for signal processing`);
-            
             this.alerts.push({ ...signal, timestamp: Date.now() });
             this.emit('alert', signal);
             try {
@@ -238,26 +216,22 @@ class OrderManager extends EventEmitter {
             }
         });
 
-        // Listen for price updates
+        // Listen for price ticks to repair positions
         this.marketData.on('priceUpdate', ({ symbol, price }) => {
             this.repairPositionsWithUnknownAvg(symbol, price);
             this.emit('priceUpdate', { symbol, price });
         });
 
-        // Periodic position sync (Optional but good for dummy APIs)
-        // setInterval(() => this.syncPositions(), 30000); // every 30s
+        console.log(`${TAG} Ready`);
     }
 
     async syncPositions() {
         try {
             const response = await this.orderExecutor.getPositions();
-            console.log('Synced positions from API');
-
             if (response && response.result && Array.isArray(response.result.positionList)) {
-                // Merge broker positions (do not wipe locally tracked symbols missing from broker)
                 response.result.positionList.forEach(pos => {
                     const symbol = this.normalizeSymbol(
-                        `${pos.ExchangeSegment}_${pos.ExchangeInstrumentId}`
+                        `${pos.ExchangeSegment}_${pos.ExchangeInstrumentID}`
                     );
                     const qty = Number(pos.NetQty);
                     if (qty === 0) {
@@ -294,149 +268,112 @@ class OrderManager extends EventEmitter {
                         ? qty * brokerAvg
                         : (avgPrice > 0 ? qty * avgPrice : (Number(existing.totalCost) || 0));
 
-                    this.positions.set(symbol, {
-                        ...existing,
-                        qty,
-                        avgPrice,
-                        totalCost,
-                        side: this.getSide(qty)
-                    });
+                    this.positions.set(symbol, { ...existing, qty, avgPrice, totalCost, side: this.getSide(qty) });
                 });
                 this.emit('positionsSynced', this.getAllPositions());
                 this.schedulePersist();
+                console.log(`${TAG} Positions synced from broker`);
             }
         } catch (error) {
-            console.error('Failed to sync positions:', error.message);
+            console.error(`${TAG} Position sync failed:`, error.message);
         }
     }
 
     async handleSignal(signal) {
-        console.log('=== OrderManager.handleSignal() CALLED ===');
-        console.log('Received signal:', JSON.stringify(signal, null, 2));
-        
         let symbol = this.normalizeSymbol(signal.symbol);
         const { quantity, position } = signal;
 
-        console.log('Processing signal for symbol:', symbol);
-        console.log('Signal details:', { quantity, position, action: signal.action });
+        console.log(`${TAG} Signal received — symbol: ${symbol}, action: ${signal.action}, position: ${position}, qty: ${quantity}`);
 
-        // Get underlying price by resolving symbol to segment_instrumentId
+        // ── Resolve underlying price ────────────────────────────────────────
         let currentPrice = null;
         if (this.orderExecutor.resolveInstrument) {
-            console.log('Resolving instrument for market data...');
             const resolved = this.orderExecutor.resolveInstrument(symbol);
             const marketDataKey = `${resolved.exchangeSegment}_${resolved.exchangeInstrumentID}`;
-            console.log('Market data key:', marketDataKey);
             currentPrice = this.marketData.getLastPrice(marketDataKey);
+            if (currentPrice == null && typeof this.marketData.fetchLTP === 'function') {
+                currentPrice = await this.marketData.fetchLTP(marketDataKey);
+            }
             if (currentPrice == null) {
-                console.log('No price found for market data key, falling back to resolveFillPrice');
-                // Fallback to original resolveFillPrice if market data key not found
                 currentPrice = this.resolveFillPrice(symbol);
             }
         } else {
-            console.log('No resolveInstrument method, using resolveFillPrice directly');
             currentPrice = this.resolveFillPrice(symbol);
         }
 
-        console.log('Current market price:', currentPrice ?? 'N/A');
+        console.log(`${TAG} Underlying price for ${symbol}: ${currentPrice ?? 'N/A'}`);
 
         let currentQty = (this.positions.get(symbol) || { qty: 0 }).qty;
-        let targetQty = this.getTargetQty(position, quantity);
+        let targetQty  = this.getTargetQty(position, quantity);
 
-        console.log('Position details:', { currentQty, targetQty });
-
-        // Try to select OTM option if we're not squaring off
+        // ── ATM option selection ────────────────────────────────────────────
         let selectedOption = null;
         if (position !== 'flat' && this.orderExecutor.selectOTMOption) {
-            console.log('Attempting to select OTM option...');
             selectedOption = this.orderExecutor.selectOTMOption(symbol, signal.action, currentPrice);
             if (selectedOption) {
-                console.log(`Selected OTM option: ${selectedOption.tradingSymbol}`);
-                console.log('Option details:', JSON.stringify(selectedOption, null, 2));
-                
-                // Subscribe to the option instrument to get its LTP
+                console.log(`${TAG} Selected option: ${selectedOption.tradingSymbol}`);
+
+                // Subscribe to the option so ticks start flowing
                 try {
-                    console.log(`Subscribing to option instrument: ${selectedOption.exchangeSegment}_${selectedOption.exchangeInstrumentID}`);
                     await this.marketData.subscribeInstruments([{
                         exchangeSegment: selectedOption.exchangeSegment,
                         exchangeInstrumentID: selectedOption.exchangeInstrumentID
                     }]);
-                    console.log('Successfully subscribed to option instrument');
                 } catch (error) {
-                    console.warn('Failed to subscribe to option instrument:', error.message);
+                    console.warn(`${TAG} Option subscription failed:`, error.message);
                 }
-                
-                // Update symbol to the option's trading symbol
+
                 symbol = selectedOption.tradingSymbol;
-                // Check position for the option instead of the underlying
                 currentQty = (this.positions.get(symbol) || { qty: 0 }).qty;
-                targetQty = this.getTargetQty(position, quantity);
-                console.log('Updated position details after option selection:', { symbol, currentQty, targetQty });
-                
-                // Now get the option's LTP instead of using underlying price
-                const optionMarketDataKey = `${selectedOption.exchangeSegment}_${selectedOption.exchangeInstrumentID}`;
-                const optionPrice = this.marketData.getLastPrice(optionMarketDataKey);
-                
+                targetQty  = this.getTargetQty(position, quantity);
+
+                // Prefer the option's own LTP over the underlying price
+                const optionKey = `${selectedOption.exchangeSegment}_${selectedOption.exchangeInstrumentID}`;
+                let optionPrice = this.marketData.getLastPrice(optionKey);
+                if (optionPrice == null && typeof this.marketData.fetchLTP === 'function') {
+                    optionPrice = await this.marketData.fetchLTP(optionKey);
+                }
+
                 if (optionPrice != null) {
-                    console.log(`Using option LTP (${optionPrice}) instead of underlying price (${currentPrice})`);
+                    console.log(`${TAG} Option LTP: ${optionPrice} (underlying was ${currentPrice})`);
                     currentPrice = optionPrice;
                 } else {
-                    console.warn(`Option LTP not available yet, still using underlying price (${currentPrice}) as fallback`);
+                    console.warn(`${TAG} Option LTP unavailable — using underlying price (${currentPrice}) as fallback`);
                 }
             } else {
-                console.warn(`Failed to select option for ${symbol}, using underlying directly`);
+                console.warn(`${TAG} No option found for ${symbol} — trading underlying directly`);
             }
         }
 
-        console.log(
-            `Processing signal for ${symbol}: position=${position}, signalQty=${quantity}, ` +
-            `currentQty=${currentQty}, targetQty=${targetQty}. Last Price: ${currentPrice ?? 'N/A'}`
-        );
+        console.log(`${TAG} ${symbol} | currentQty: ${currentQty}, targetQty: ${targetQty}, price: ${currentPrice ?? 'N/A'}`);
 
-        // Handle target position 'flat' as a square-off signal
+        // ── Handle flat / square-off ────────────────────────────────────────
         if (position === 'flat') {
-            console.log(`Signal indicates 'flat' position. Squaring off ${symbol}...`);
+            console.log(`${TAG} Squaring off ${symbol}...`);
             try {
                 const result = await this.squareOff(symbol);
-                this.emit('order', {
-                    signal,
-                    result,
-                    status: 'SQUARED_OFF',
-                    timestamp: Date.now()
-                });
+                this.emit('order', { signal, result, status: 'SQUARED_OFF', timestamp: Date.now() });
                 this.emit('positionUpdate', this.getPosition(symbol));
-                return;
             } catch (error) {
-                console.error(`Automatic square-off failed for ${symbol}:`, error.message);
+                console.error(`${TAG} Square-off failed for ${symbol}:`, error.message);
             }
-        }
-
-        const delta = targetQty - currentQty;
-        if (delta === 0) {
-            console.log(`No order needed — already at target qty ${targetQty} for ${symbol}`);
             return;
         }
 
-        const action = delta > 0 ? 'BUY' : 'SELL';
-        const orderQty = Math.abs(delta);
+        // ── Compute delta and place order ───────────────────────────────────
+        const delta = targetQty - currentQty;
+        if (delta === 0) {
+            console.log(`${TAG} Already at target qty ${targetQty} for ${symbol} — no order needed`);
+            return;
+        }
 
-        console.log('=== PREPARING TO PLACE ORDER ===');
-        console.log('Order details:', {
-            symbol,
-            action,
-            quantity: orderQty,
-            orderType: signal.orderType || 'LIMIT',
-            limitPrice: signal.limitPrice || currentPrice,
-            productType: signal.productType || 'MIS',
-            instrumentType: signal.instrumentType
-        });
-        console.log('=================================');
+        const action   = delta > 0 ? 'BUY' : 'SELL';
+        const orderQty = Math.abs(delta);
+        const resolvedLimitPrice = signal.limitPrice || currentPrice;
+
+        console.log(`${TAG} Placing order — ${action} x${orderQty} ${symbol} @ ${resolvedLimitPrice ?? 'MARKET'}`);
 
         try {
-            // Use current market price as limit price if not provided for LIMIT orders
-            const resolvedLimitPrice = signal.limitPrice || currentPrice;
-            
-            console.log('Calling orderExecutor.placeOrder()...');
             const result = await this.orderExecutor.placeOrder({
                 symbol,
                 action,
@@ -447,17 +384,13 @@ class OrderManager extends EventEmitter {
                 instrumentType: signal.instrumentType
             });
 
-            console.log(`Order Placed Successfully:`, JSON.stringify(result));
-
             const fillPrice =
                 this.extractFillPriceFromOrderResult(result) ??
                 this.resolveFillPrice(symbol) ??
                 null;
 
             if (fillPrice == null) {
-                console.warn(
-                    `[OrderManager] No fill price for ${symbol} yet — avg entry will update on first market tick`
-                );
+                console.warn(`${TAG} No fill price for ${symbol} yet — avg entry will be updated on first tick`);
             }
 
             const orderEntry = {
@@ -477,40 +410,14 @@ class OrderManager extends EventEmitter {
             };
 
             this.orders.push(orderEntry);
-            if (fillPrice != null) {
-                this.updatePosition(symbol, action, orderQty, fillPrice, {
-                    lastOrderQty: orderQty,
-                    targetQty
-                });
-            } else {
-                this.updatePosition(symbol, action, orderQty, null, {
-                    lastOrderQty: orderQty,
-                    targetQty
-                });
-            }
+            this.updatePosition(symbol, action, orderQty, fillPrice, { lastOrderQty: orderQty, targetQty });
             this.emit('order', orderEntry);
             this.emit('positionUpdate', this.getPosition(symbol));
 
-            console.log('=== ORDER CREATED ===');
-            console.log(JSON.stringify({
-                id: orderEntry.id,
-                symbol: orderEntry.symbol,
-                action: orderEntry.action,
-                quantity: orderEntry.quantity,
-                marketPrice: orderEntry.marketPrice,
-                trackingPrice: orderEntry.price,
-                status: orderEntry.status,
-                timestamp: orderEntry.timestamp
-            }, null, 2));
-
+            console.log(`${TAG} Order placed — id: ${orderEntry.id}, fillPrice: ${fillPrice ?? 'pending'}`);
         } catch (error) {
-            console.error(`Order Placement Failed for ${symbol}:`, error.message);
-            const failedOrder = {
-                signal,
-                error: error.message,
-                timestamp: Date.now(),
-                status: 'FAILED'
-            };
+            console.error(`${TAG} Order failed for ${symbol}:`, error.message);
+            const failedOrder = { signal, error: error.message, timestamp: Date.now(), status: 'FAILED' };
             this.orders.push(failedOrder);
             this.emit('order', failedOrder);
             this.schedulePersist();
@@ -519,7 +426,7 @@ class OrderManager extends EventEmitter {
 
     updatePosition(symbol, action, quantity, price, meta = {}) {
         let pos = this.positions.get(symbol) || { qty: 0, avgPrice: 0, totalCost: 0 };
-        const tradeQty = action === 'BUY' ? quantity : -quantity;
+        const tradeQty  = action === 'BUY' ? quantity : -quantity;
         const fillPrice = price != null && Number(price) > 0 ? Number(price) : null;
 
         const oldQty = pos.qty;
@@ -542,7 +449,7 @@ class OrderManager extends EventEmitter {
             if ((oldQty >= 0 && tradeQty > 0) || (oldQty <= 0 && tradeQty < 0)) {
                 if (fillPrice != null) {
                     const newTotalCost = pos.totalCost + (quantity * fillPrice);
-                    pos.avgPrice = newTotalCost / Math.abs(newQty);
+                    pos.avgPrice  = newTotalCost / Math.abs(newQty);
                     pos.totalCost = newTotalCost;
                 } else if (pos.avgPrice > 0) {
                     pos.totalCost = pos.avgPrice * Math.abs(newQty);
@@ -550,10 +457,10 @@ class OrderManager extends EventEmitter {
             } else if (pos.avgPrice > 0) {
                 pos.totalCost = pos.avgPrice * Math.abs(newQty);
             }
-            pos.qty = newQty;
-            pos.side = this.getSide(newQty);
+            pos.qty          = newQty;
+            pos.side         = this.getSide(newQty);
             pos.lastOrderQty = meta.lastOrderQty ?? quantity;
-            pos.targetQty = meta.targetQty ?? pos.targetQty;
+            pos.targetQty    = meta.targetQty ?? pos.targetQty;
             this.positions.set(symbol, pos);
         }
         this.schedulePersist();
@@ -561,11 +468,7 @@ class OrderManager extends EventEmitter {
 
     getPosition(symbol) {
         const data = this.positions.get(symbol) || { qty: 0, avgPrice: 0 };
-        return {
-            symbol,
-            ...data,
-            side: data.side || this.getSide(data.qty)
-        };
+        return { symbol, ...data, side: data.side || this.getSide(data.qty) };
     }
 
     getAllPositions() {
@@ -583,24 +486,17 @@ class OrderManager extends EventEmitter {
         if (!pos || pos.qty === 0) return { error: 'No open position' };
 
         const quantity = Math.abs(pos.qty);
-
-        console.log(`Manual Square-off triggered for ${symbol}: Qty ${quantity}`);
+        console.log(`${TAG} Square-off: ${symbol} qty ${quantity}`);
 
         try {
             const result = await this.orderExecutor.squareOffPosition({ symbol, quantity });
-            console.log(`Square-off result for ${symbol}:`, JSON.stringify(result));
-
-            // Still update local position tracking
-            const action = pos.qty > 0 ? 'SELL' : 'BUY';
-            const exitPrice =
-                this.extractFillPriceFromOrderResult(result) ??
-                this.resolveFillPrice(symbol);
+            const action    = pos.qty > 0 ? 'SELL' : 'BUY';
+            const exitPrice = this.extractFillPriceFromOrderResult(result) ?? this.resolveFillPrice(symbol);
             this.updatePosition(symbol, action, quantity, exitPrice);
             this.emit('positionUpdate', this.getPosition(symbol));
-
             return result;
         } catch (error) {
-            console.error(`Square-off failed for ${symbol}:`, error.message);
+            console.error(`${TAG} Square-off failed for ${symbol}:`, error.message);
             throw error;
         }
     }
@@ -616,4 +512,3 @@ class OrderManager extends EventEmitter {
 }
 
 module.exports = OrderManager;
-

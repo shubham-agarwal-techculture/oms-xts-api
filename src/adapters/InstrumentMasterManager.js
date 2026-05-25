@@ -3,6 +3,8 @@ const path = require('path');
 const axios = require('axios');
 const https = require('https');
 
+const TAG = '[Master]';
+
 class InstrumentMasterManager {
     constructor(config) {
         this.config = config;
@@ -35,7 +37,6 @@ class InstrumentMasterManager {
     ensureMasterDir() {
         if (!fs.existsSync(this.masterDir)) {
             fs.mkdirSync(this.masterDir, { recursive: true });
-            console.log(`Created instrument master directory: ${this.masterDir}`);
         }
     }
 
@@ -62,29 +63,19 @@ class InstrumentMasterManager {
      * Login to XTS API (if not already logged in)
      */
     async login() {
-        if (this.token) {
-            console.log('Already logged in for instrument master');
-            return;
-        }
+        if (this.token) return;
 
-        console.log('Logging in to XTS for instrument master...');
         try {
             const response = await this.client.post('/auth/login', {
                 appKey: this.config.appKey,
                 secretKey: this.config.secretKey
             });
-
             const data = Array.isArray(response.data) ? response.data[0] : response.data;
             this.token = data?.result?.token;
-            
-            if (!this.token) {
-                throw new Error('No token received in login response');
-            }
-            
+            if (!this.token) throw new Error('No token received in login response');
             this.client.defaults.headers.common['authorization'] = this.token;
-            console.log('Instrument master login successful');
         } catch (error) {
-            console.error('Instrument master login failed:', error.response?.data || error.message);
+            console.error(`${TAG} Login failed:`, error.response?.data?.description || error.message);
             throw error;
         }
     }
@@ -213,26 +204,20 @@ class InstrumentMasterManager {
      */
     async downloadMaster(exchangeSegmentCode) {
         await this.login();
-        
-        console.log(`Downloading instrument master for exchange segment ${exchangeSegmentCode}...`);
-        
+        console.log(`${TAG} Downloading master for ${exchangeSegmentCode}...`);
         try {
             const response = await this.client.post('/instruments/master', {
                 exchangeSegmentList: [exchangeSegmentCode]
             });
-            
             const pipeData = response.data?.result || '';
             const instruments = this.parsePipeData(pipeData, exchangeSegmentCode);
-            
-            // Save to file
             this.ensureMasterDir();
             const filePath = this.getMasterFilePath(exchangeSegmentCode);
             fs.writeFileSync(filePath, JSON.stringify(instruments, null, 2));
-            console.log(`Saved instrument master to ${filePath} (${instruments.length} instruments)`);
-            
+            console.log(`${TAG} Downloaded ${instruments.length} instruments for ${exchangeSegmentCode}`);
             return instruments;
         } catch (error) {
-            console.error(`Failed to download instrument master for segment ${exchangeSegmentCode}:`, error.response?.data || error.message);
+            console.error(`${TAG} Download failed for ${exchangeSegmentCode}:`, error.response?.data?.description || error.message);
             throw error;
         }
     }
@@ -244,16 +229,11 @@ class InstrumentMasterManager {
      */
     async loadMaster(exchangeSegmentCode) {
         this.ensureMasterDir();
-        
         if (this.masterFileExists(exchangeSegmentCode)) {
-            console.log(`Loading instrument master from file for segment ${exchangeSegmentCode}`);
             const filePath = this.getMasterFilePath(exchangeSegmentCode);
-            const data = fs.readFileSync(filePath, 'utf8');
-            return JSON.parse(data);
-        } else {
-            console.log(`Instrument master file not found for segment ${exchangeSegmentCode}`);
-            return this.downloadMaster(exchangeSegmentCode);
+            return JSON.parse(fs.readFileSync(filePath, 'utf8'));
         }
+        return this.downloadMaster(exchangeSegmentCode);
     }
 
     /**
@@ -317,20 +297,20 @@ class InstrumentMasterManager {
                     }
                 });
                 
-                console.log(`Loaded ${instruments.length} instruments for segment ${segmentCode}`);
+                console.log(`${TAG} Loaded ${instruments.length} instruments for ${segmentCode}`);
             } catch (error) {
-                console.error(`Failed to load instrument master for segment ${segmentCode}:`, error.message);
+                console.error(`${TAG} Failed to load ${segmentCode}:`, error.message);
             }
         }
 
-        // Add default NIFTY mapping (in case master download fails)
+        // Fallback NIFTY mapping in case master download failed
         if (!symbolMap.NIFTY) {
-            console.warn('Adding default NIFTY mapping');
-            symbolMap.NIFTY = { exchangeSegment: 1, exchangeInstrumentID: 22 };
+            console.warn(`${TAG} NIFTY not found in master — using default mapping`);
+            symbolMap.NIFTY  = { exchangeSegment: 1, exchangeInstrumentID: 22 };
             symbolMap.NIFTY50 = { exchangeSegment: 1, exchangeInstrumentID: 22 };
         }
 
-        console.log(`Symbol map built with ${Object.keys(symbolMap).length} symbols`);
+        console.log(`${TAG} Symbol map built — ${Object.keys(symbolMap).length} entries`);
         return symbolMap;
     }
 
@@ -418,13 +398,13 @@ class InstrumentMasterManager {
     selectOTMOption(instruments, underlying, action, underlyingPrice = null) {
         const options = this.getOptionsForUnderlying(instruments, underlying);
         if (options.length === 0) {
-            console.warn(`No options found for underlying: ${underlying}`);
+            console.warn(`${TAG} No options found for underlying: ${underlying}`);
             return null;
         }
 
         const recentExpiry = this.findMostRecentExpiry(options);
         if (!recentExpiry) {
-            console.warn(`No valid future expiries found for underlying: ${underlying}`);
+            console.warn(`${TAG} No valid future expiry found for ${underlying}`);
             return null;
         }
 
@@ -445,7 +425,7 @@ class InstrumentMasterManager {
         );
 
         if (targetOptions.length === 0) {
-            console.warn(`No ${targetOptionType} options found for expiry: ${recentExpiry.toDateString()}`);
+            console.warn(`${TAG} No ${targetOptionType} options for ${underlying} expiry ${recentExpiry.toDateString()}`);
             return null;
         }
 
@@ -456,17 +436,17 @@ class InstrumentMasterManager {
             return strikeA - strikeB;
         });
 
-        // Select OTM strike:
-        // - For CE: first strike > underlying price (if known), otherwise middle strike
-        // - For PE: first strike < underlying price (if known), otherwise middle strike
+        // Select ATM strike (closest to underlying price)
         let selectedOption;
         if (underlyingPrice && typeof underlyingPrice === 'number' && !isNaN(underlyingPrice)) {
-            if (targetOptionType === 'CE') {
-                selectedOption = targetOptions.find(opt => (opt.strikePrice || 0) > underlyingPrice) || targetOptions[targetOptions.length - 1];
-            } else { // PE
-                // Create a copy before reversing to avoid mutating the original
-                const reversedOptions = [...targetOptions].reverse();
-                selectedOption = reversedOptions.find(opt => (opt.strikePrice || 0) < underlyingPrice) || targetOptions[0];
+            let minDiff = Infinity;
+            for (const opt of targetOptions) {
+                const strike = opt.strikePrice || 0;
+                const diff = Math.abs(strike - underlyingPrice);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    selectedOption = opt;
+                }
             }
         } else {
             // If we don't have underlying price, pick the middle strike as a fallback
@@ -474,7 +454,7 @@ class InstrumentMasterManager {
             selectedOption = targetOptions[middleIndex];
         }
 
-        console.log(`Selected OTM option: ${selectedOption.tradingSymbol} for underlying ${underlying} (${action})`);
+        console.log(`${TAG} ATM option selected: ${selectedOption.tradingSymbol} (strike ${selectedOption.strikePrice}, ${targetOptionType})`);
         return selectedOption;
     }
 }
