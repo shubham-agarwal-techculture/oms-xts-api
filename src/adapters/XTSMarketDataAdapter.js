@@ -77,14 +77,9 @@ class XTSMarketDataAdapter extends MarketDataProvider {
             console.log('Extracted userID:', this.userID);
             
             if (!this.token) throw new Error('Login failed: Token not received');
-            // Set authorization header with raw token (matches XTSOrderExecutor approach)
+            // Set both authorization and token headers as required by XTS API
             this.client.defaults.headers.common['authorization'] = this.token;
-            this.client.defaults.headers.common['Authorization'] = this.token;
             this.client.defaults.headers.common['token'] = this.token;
-            this.client.defaults.headers.common['Token'] = this.token;
-            // Remove any Bearer prefix that might have been set
-            delete this.client.defaults.headers.common['Authorization'];
-            this.client.defaults.headers.common['Authorization'] = this.token;
             console.log('Set authorization header (raw):', this.client.defaults.headers.common['authorization'] ? 'Header set' : 'Header NOT set');
             console.log('Set token header:', this.client.defaults.headers.common['token'] ? 'Header set' : 'Header NOT set');
             console.log('Market Data login successful');
@@ -229,15 +224,13 @@ class XTSMarketDataAdapter extends MarketDataProvider {
         console.log('Authorization header in client:', this.client.defaults.headers.common['authorization'] ? 'Header present' : 'Header NOT present');
         console.log('Subscription payload:', JSON.stringify({
             instruments,
-            xtsMessageCode: 1502,
-            publishFormat: 'JSON'
+            xtsMessageCode: 1502
         }));
         
         try {
             const response = await this.client.post('/instruments/subscription', {
                 instruments,
-                xtsMessageCode: 1502, // 1502 = Market Data Touchline
-                publishFormat: 'JSON'
+                xtsMessageCode: 1502 // 1502 = Market Data Touchline
             });
             
             console.log('Subscription response:', JSON.stringify(response.data));
@@ -245,6 +238,9 @@ class XTSMarketDataAdapter extends MarketDataProvider {
             return response.data;
         } catch (error) {
             console.error('Failed to subscribe:', error.response?.data || error.message);
+            if (error.response?.data?.result?.errors) {
+                console.error('Detailed errors:', JSON.stringify(error.response.data.result.errors, null, 2));
+            }
             if (error.response) {
                 console.error('Subscription error response status:', error.response.status);
                 console.error('Subscription error response headers:', JSON.stringify(error.response.headers));
@@ -282,8 +278,7 @@ class XTSMarketDataAdapter extends MarketDataProvider {
         try {
             const response = await this.client.put('/instruments/subscription', {
                 instruments,
-                xtsMessageCode: 1502,
-                publishFormat: 'JSON'
+                xtsMessageCode: 1502
             });
             
             console.log('Unsubscription successful');
