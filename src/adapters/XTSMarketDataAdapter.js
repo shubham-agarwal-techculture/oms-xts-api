@@ -11,7 +11,7 @@ class XTSMarketDataAdapter extends MarketDataProvider {
         this.config = config;
         this.socket = null;
         this.token = null;
-        this.userID = null;
+        this.userID = null;k
         this.lastPrices = new Map();
         this.lastSymbol = null;
         this.events = new EventEmitter();
