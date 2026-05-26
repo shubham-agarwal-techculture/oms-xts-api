@@ -251,25 +251,72 @@ class XTSMarketDataAdapter extends MarketDataProvider {
      * @param {Array<{exchangeSegment: number, exchangeInstrumentID: number}>} instruments
      */
     async getQuotes(instruments) {
-        if (!this.token) await this.login();
+    if (!this.token) await this.login();
+    const normalizedInstruments = instruments.map(instr => ({
+        exchangeSegment: Number(instr.exchangeSegment),
+        exchangeInstrumentID: Number(instr.exchangeInstrumentID)
+    }));
 
-        const normalizedInstruments = instruments.map(instr => ({
-            exchangeSegment: Number(instr.exchangeSegment),
-            exchangeInstrumentID: Number(instr.exchangeInstrumentID)
-        }));
+    const payload = {
+        instruments: normalizedInstruments,
+        xtsMessageCode: 1502,
+        publishFormat: 'JSON'
+    };
 
-        try {
-            const response = await this.client.post('/instruments/quotes', {
-                instruments: normalizedInstruments,
-                xtsMessageCode: 1512,
-                publishFormat: 'JSON'
-            });
-            return response.data;
-        } catch (error) {
-            console.error(`${TAG} getQuotes failed:`, error.response?.data?.description || error.message);
-            throw error;
+    try {
+        const response = await this.client.post('/instruments/quotes', payload);
+        return response.data;
+
+    } catch (error) {
+
+        const invalidToken =
+            error.response?.data?.code === 'e-session-0007' ||
+            error.response?.data?.description === 'Invalid Token';
+
+        if (invalidToken) {
+            console.warn(`${TAG} Token expired during getQuotes(), re-logging in...`);
+
+            this.token = null;
+
+            await this.login();
+
+            const retryResponse = await this.client.post(
+                '/instruments/quotes',
+                payload
+            );
+
+            return retryResponse.data;
         }
+
+        console.error(
+            `${TAG} getQuotes failed:`,
+            error.response?.data?.description || error.message
+        );
+
+        throw error;
     }
+}    
+    // async getQuotes(instruments) {
+    //     if (!this.token) await this.login();
+
+    //     const normalizedInstruments = instruments.map(instr => ({
+    //         exchangeSegment: Number(instr.exchangeSegment),
+    //         exchangeInstrumentID: Number(instr.exchangeInstrumentID)
+    //     }));
+
+    //     try {
+    //         const response = await this.client.post('/instruments/quotes', {
+    //             instruments: normalizedInstruments,
+    //             xtsMessageCode: 1512,
+    //             publishFormat: 'JSON'
+    //         });
+    //         return response.data;
+    //     } catch (error) {
+    //         console.error(`${TAG} getQuotes failed:`, error.response?.data?.description || error.message);
+    //         throw error;
+    //     }
+    // }
+
 
     /**
      * Fetch LTP for a symbol via HTTP REST when no WebSocket tick exists yet.
@@ -278,46 +325,158 @@ class XTSMarketDataAdapter extends MarketDataProvider {
      * @returns {Promise<number|null>}
      */
     async fetchLTP(symbol) {
-        if (!symbol) return null;
 
-        // Dummy WebSocket mode — no REST endpoint available
-        const isDummy = this.config.baseUrl && (this.config.baseUrl.startsWith('ws://') || this.config.baseUrl.startsWith('wss://'));
-        if (isDummy) return this.getLastPrice(symbol);
+    if (!symbol) return null;
 
-        const [exchangeSegment, exchangeInstrumentID] = symbol.split('_');
-        if (!exchangeSegment || !exchangeInstrumentID) {
-            console.warn(`${TAG} fetchLTP: invalid symbol format "${symbol}"`);
+    // Dummy WebSocket mode
+    const isDummy =
+        this.config.baseUrl &&
+        (
+            this.config.baseUrl.startsWith('ws://') ||
+            this.config.baseUrl.startsWith('wss://')
+        );
+
+    if (isDummy) {
+        return this.getLastPrice(symbol);
+    }
+
+    // Return cached price first if available
+    const cached = this.getLastPrice(symbol);
+    if (cached !== null) {
+        return cached;
+    }
+
+    const [exchangeSegment, exchangeInstrumentID] = symbol.split('_');
+
+    if (!exchangeSegment || !exchangeInstrumentID) {
+        console.warn(`${TAG} fetchLTP: invalid symbol format "${symbol}"`);
+        return null;
+    }
+
+    try {
+
+        console.log(`${TAG} Fetching LTP via HTTP for ${symbol}`);
+
+        const response = await this.getQuotes([
+            {
+                exchangeSegment: Number(exchangeSegment),
+                exchangeInstrumentID: Number(exchangeInstrumentID)
+            }
+        ]);
+
+        console.log(
+            `${TAG} QUOTES RESPONSE:`,
+            JSON.stringify(response.data || response, null, 2)
+        );
+
+        const result = response?.result || response?.data?.result || {};
+        const listQuotes = result?.listQuotes || [];
+
+        if (!Array.isArray(listQuotes) || listQuotes.length === 0) {
+            console.warn(`${TAG} fetchLTP: empty listQuotes for ${symbol}`);
             return null;
         }
 
-        try {
-            console.log(`${TAG} Fetching LTP via HTTP for ${symbol}`);
-            const response = await this.getQuotes([{
-                exchangeSegment: Number(exchangeSegment),
-                exchangeInstrumentID: Number(exchangeInstrumentID)
-            }]);
+        for (const quoteItem of listQuotes) {
 
-            const listQuotes = response?.result?.listQuotes || [];
-            for (const quoteStr of listQuotes) {
-                const q = typeof quoteStr === 'string' ? (() => { try { return JSON.parse(quoteStr); } catch { return null; } })() : quoteStr;
-                if (!q) continue;
-                const price = q.LastTradedPrice ?? q.LTP ?? q.LastPrice;
-                const numPrice = Number(price);
-                if (Number.isFinite(numPrice) && numPrice > 0) {
-                    this.lastPrices.set(symbol, numPrice);
-                    this.lastSymbol = symbol;
-                    console.log(`${TAG} LTP for ${symbol}: ${numPrice}`);
-                    return numPrice;
+            let q = quoteItem;
+
+            // Some XTS brokers return quote as JSON string
+            if (typeof q === 'string') {
+                try {
+                    q = JSON.parse(q);
+                } catch (e) {
+                    console.warn(`${TAG} Failed to parse quote string`);
+                    continue;
                 }
             }
 
-            console.warn(`${TAG} fetchLTP: no valid price in response for ${symbol}`);
-            return null;
-        } catch (error) {
-            console.error(`${TAG} fetchLTP failed for ${symbol}:`, error.message);
-            return null;
+            console.log(
+                `${TAG} PARSED QUOTE:`,
+                JSON.stringify(q, null, 2)
+            );
+
+            const price =
+                q?.Touchline?.LastTradedPrice ??
+                q?.LastTradedPrice ??
+                q?.LastPrice ??
+                q?.LTP ??
+                q?.ltp ??
+                q?.Close ??
+                q?.close;
+
+            const numPrice = Number(price);
+
+            if (Number.isFinite(numPrice) && numPrice > 0) {
+
+                this.lastPrices.set(symbol, numPrice);
+                this.lastSymbol = symbol;
+
+                console.log(`${TAG} LTP for ${symbol}: ${numPrice}`);
+
+                return numPrice;
+            }
         }
+
+        console.warn(
+            `${TAG} fetchLTP: no valid price in response for ${symbol}`
+        );
+
+        return null;
+
+    } catch (error) {
+
+        console.error(
+            `${TAG} fetchLTP failed for ${symbol}:`,
+            error.response?.data || error.message
+        );
+
+        return null;
     }
+    }
+    
+    // async fetchLTP(symbol) {
+    //     if (!symbol) return null;
+
+    //     // Dummy WebSocket mode — no REST endpoint available
+    //     const isDummy = this.config.baseUrl && (this.config.baseUrl.startsWith('ws://') || this.config.baseUrl.startsWith('wss://'));
+    //     if (isDummy) return this.getLastPrice(symbol);
+
+    //     const [exchangeSegment, exchangeInstrumentID] = symbol.split('_');
+    //     if (!exchangeSegment || !exchangeInstrumentID) {
+    //         console.warn(`${TAG} fetchLTP: invalid symbol format "${symbol}"`);
+    //         return null;
+    //     }
+
+    //     try {
+    //         console.log(`${TAG} Fetching LTP via HTTP for ${symbol}`);
+    //         const response = await this.getQuotes([{
+    //             exchangeSegment: Number(exchangeSegment),
+    //             exchangeInstrumentID: Number(exchangeInstrumentID)
+    //         }]);
+
+    //         const listQuotes = response?.result?.listQuotes || [];
+    //         for (const quoteStr of listQuotes) {
+    //             const q = typeof quoteStr === 'string' ? (() => { try { return JSON.parse(quoteStr); } catch { return null; } })() : quoteStr;
+    //             if (!q) continue;
+    //             // const price = q.LastTradedPrice ?? q.LTP ?? q.LastPrice;
+    //             const price = q.Touchline?.LastTradedPrice ?? q.LastTradedPrice ?? q.LTP ?? q.LastPrice;
+    //             const numPrice = Number(price);
+    //             if (Number.isFinite(numPrice) && numPrice > 0) {
+    //                 this.lastPrices.set(symbol, numPrice);
+    //                 this.lastSymbol = symbol;
+    //                 console.log(`${TAG} LTP for ${symbol}: ${numPrice}`);
+    //                 return numPrice;
+    //             }
+    //         }
+
+    //         console.warn(`${TAG} fetchLTP: no valid price in response for ${symbol}`);
+    //         return null;
+    //     } catch (error) {
+    //         console.error(`${TAG} fetchLTP failed for ${symbol}:`, error.message);
+    //         return null;
+    //     }
+    // }
 
     getActiveSymbol() {
         return this.lastSymbol;

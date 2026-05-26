@@ -1,8 +1,8 @@
 const axios = require('axios');
 
 const testSignal = {
-    symbol: 'COALINDIA',
-    action: 'sell',
+    symbol: 'NIFTY',
+    action: 'BUY',
     quantity: 1,
     position: 'long',
     orderType: 'limit',
