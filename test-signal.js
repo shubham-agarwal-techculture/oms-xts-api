@@ -1,8 +1,8 @@
 const axios = require('axios');
 
 const testSignal = {
-    symbol: 'BANKNIFTY',
-    action: 'BUY',
+    symbol: 'wipro',
+    action: 'buy',
     quantity: 1,
     position: 'long',
     orderType: 'limit',

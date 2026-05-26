@@ -3,7 +3,21 @@ const InstrumentMasterManager = require('./InstrumentMasterManager');
 const axios = require('axios');
 const https = require('https');
 
+
 const TAG = '[OrderExecutor]';
+
+const SEGMENT_ID_TO_CODE = {
+    1: 'NSECM',
+    2: 'NSEFO',
+    3: 'NSECD',
+    4: 'NSECO',
+    11: 'BSECM',
+    12: 'BSEFO',
+    13: 'BSECD',
+    14: 'BSECO',
+    21: 'MCXFO',
+    41: 'NCDEX'
+};
 
 class XTSOrderExecutor extends OrderExecutor {
     constructor(config) {
@@ -89,127 +103,6 @@ class XTSOrderExecutor extends OrderExecutor {
      * @param {string} symbol
      * @returns {{ exchangeSegment: number, exchangeInstrumentID: number }}
      */
-//     resolveInstrument(symbol, options = {}) {
-
-//     // Direct segment_id format
-//     if (symbol && symbol.includes('_')) {
-
-//         const [seg, id] = symbol.split('_');
-
-//         return {
-//             exchangeSegment: Number(seg),
-//             exchangeInstrumentID: Number(id)
-//         };
-//     }
-
-//     const {
-//         instrumentType = null,
-//         expiry = null,
-//         optionType = null
-//     } = options;
-
-//     const targetSymbol = (symbol || 'NIFTY')
-//         .toUpperCase()
-//         .trim();
-
-//     // Find all matching instruments
-//     let matches = this.instruments.filter(instr => {
-
-//         const name =
-//             instr.name ||
-//             instr.Name ||
-//             instr.UnderlyingIndexName ||
-//             instr.Symbol;
-
-//         return String(name).toUpperCase() === targetSymbol;
-//     });
-
-//     if (matches.length === 0) {
-
-//         console.warn(
-//             `${TAG} Symbol "${targetSymbol}" not found`
-//         );
-
-//         return {
-//             exchangeSegment: 1,
-//             exchangeInstrumentID: Number(targetSymbol) || targetSymbol
-//         };
-//     }
-
-//     // NSEFO only
-//     matches = matches.filter(x =>
-//         Number(x.exchangeSegment || x.ExchangeSegment) === 2
-//     );
-
-//     // FUTURE / OPTION filtering
-//     if (instrumentType !== null) {
-
-//         matches = matches.filter(x =>
-//             Number(
-//                 x.instrumentType ||
-//                 x.InstrumentType
-//             ) === Number(instrumentType)
-//         );
-//     }
-
-//     // CE / PE filtering
-//     if (optionType) {
-
-//         matches = matches.filter(x => {
-
-//             const opt =
-//                 x.optionType ||
-//                 x.OptionType;
-
-//             return String(opt).toUpperCase() === optionType.toUpperCase();
-//         });
-//     }
-
-//     // Expiry filtering
-//     if (expiry) {
-
-//         matches = matches.filter(x => {
-
-//             const exp =
-//                 x.expiry ||
-//                 x.Expiry;
-
-//             return String(exp) === String(expiry);
-//         });
-//     }
-
-//     if (matches.length === 0) {
-
-//         console.warn(
-//             `${TAG} No filtered match for "${targetSymbol}"`
-//         );
-
-//         return null;
-//     }
-
-//     // Nearest expiry first
-//     matches.sort((a, b) => {
-
-//         const ea = new Date(a.expiry || a.Expiry);
-//         const eb = new Date(b.expiry || b.Expiry);
-
-//         return ea - eb;
-//     });
-
-//     const selected = matches[0];
-
-//     console.log(
-//         `${TAG} Resolved "${symbol}" → seg=${selected.exchangeSegment} id=${selected.exchangeInstrumentID}`
-//     );
-
-//     return {
-//         exchangeSegment:
-//             Number(selected.exchangeSegment || selected.ExchangeSegment),
-
-//         exchangeInstrumentID:
-//             Number(selected.exchangeInstrumentID || selected.ExchangeInstrumentID)
-//     };
-// }
     
     resolveInstrument(symbol) {
         if (symbol && symbol.includes('_')) {
@@ -234,7 +127,7 @@ class XTSOrderExecutor extends OrderExecutor {
     async login() {
         console.log(`${TAG} Logging in to XTS Interactive...`);
         try {
-            const response = await this.client.post('/auth/login', {
+            const response = await this.client.post('/user/session', {
                 appKey: this.config.appKey,
                 secretKey: this.config.secretKey
             });
@@ -256,30 +149,27 @@ class XTSOrderExecutor extends OrderExecutor {
         if (!this.token) await this.login();
 
         const { exchangeSegment, exchangeInstrumentID } = this.resolveInstrument(orderDetails.symbol);
+        const segmentCode = SEGMENT_ID_TO_CODE[exchangeSegment] || exchangeSegment;
 
         const payload = {
-            exchangeSegment: Number(exchangeSegment) || exchangeSegment,
-            exchangeInstrumentID: Number(exchangeInstrumentID) || exchangeInstrumentID,
-            productType: orderDetails.productType || 'MIS',
-            orderType: orderDetails.orderType || 'LIMIT',
-            orderSide: orderDetails.action,
-            orderQuantity: orderDetails.quantity,
+            exchangeSegment: String(segmentCode),
+            exchangeInstrumentID: Number(exchangeInstrumentID),
+            productType: (orderDetails.productType || 'MIS').toUpperCase(),
+            orderType: (orderDetails.orderType || 'LIMIT').toUpperCase(),
+            orderSide: (orderDetails.action || 'BUY').toUpperCase(),
+            timeInForce: 'DAY',
+            orderQuantity: Number(orderDetails.quantity),
             disclosedQuantity: 0,
-            validity: 'DAY',
-            orderValue: 0,
-            isStopLossOrder: orderDetails.orderType === 'COVER',
-            stopLossPrice: orderDetails.stopLossPrice || 0,
-            limitPrice: orderDetails.limitPrice || 0,
-            isVTDOrder: false,
-            vtdMarketProtectionPercentage: 0,
-            isIOCOrder: false,
-            clientOrderID: `OMS_${Date.now()}`
+            limitPrice: Number(orderDetails.limitPrice) || 0,
+            stopPrice: Number(orderDetails.stopLossPrice) || 0,
+            orderUniqueIdentifier: `OMS_${Date.now()}`,
+            clientID: '*****',
         };
 
         console.log(`${TAG} Placing ${payload.orderType} ${payload.orderSide} x${payload.orderQuantity} ${orderDetails.symbol} @ ${payload.limitPrice}`);
 
         try {
-            const response = await this.client.post('/interactive/orders', payload);
+            const response = await this.client.post('/orders', payload);
             const appOrderID = response.data?.result?.AppOrderID;
             console.log(`${TAG} Order placed — AppOrderID: ${appOrderID}`);
             return response.data;
@@ -297,7 +187,9 @@ class XTSOrderExecutor extends OrderExecutor {
 
     async getOrderStatus(orderId) {
         if (!this.token) await this.login();
-        const response = await this.client.get(`/interactive/orders/${orderId}`);
+        const response = await this.client.get('/orders', {
+            params: { appOrderID: orderId }
+        });
         return response.data;
     }
 
@@ -311,19 +203,21 @@ class XTSOrderExecutor extends OrderExecutor {
         if (!this.token) await this.login();
 
         const { exchangeSegment, exchangeInstrumentID } = this.resolveInstrument(details.symbol);
+        const segmentCode = SEGMENT_ID_TO_CODE[exchangeSegment] || exchangeSegment;
 
         const payload = {
-            exchangeSegment: Number(exchangeSegment) || exchangeSegment,
-            exchangeInstrumentID: Number(exchangeInstrumentID) || exchangeInstrumentID,
-            productType: 'MIS',
-            squareOffMode: 'Full',
-            orderQuantity: details.quantity
+            exchangeSegment: String(segmentCode),
+            exchangeInstrumentID: Number(exchangeInstrumentID),
+            productType: details.productType || 'MIS',
+            squareoffMode: 'DayWise',
+            positionSquareOffQuantityType: 'ExactQty',
+            squareOffQtyValue: Number(details.quantity)
         };
 
         console.log(`${TAG} Squaring off ${details.symbol} (qty: ${details.quantity})`);
 
         try {
-            const response = await this.client.post('/interactive/positions/squareoff', payload);
+            const response = await this.client.put('/portfolio/squareoff', payload);
             console.log(`${TAG} Square-off successful for ${details.symbol}`);
             return response.data;
         } catch (error) {
