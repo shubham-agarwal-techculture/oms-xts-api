@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 const testSignal = {
-    symbol: 'NIFTY',
+    symbol: 'BANKNIFTY',
     action: 'BUY',
     quantity: 1,
     position: 'long',

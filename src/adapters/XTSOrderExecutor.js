@@ -89,6 +89,128 @@ class XTSOrderExecutor extends OrderExecutor {
      * @param {string} symbol
      * @returns {{ exchangeSegment: number, exchangeInstrumentID: number }}
      */
+//     resolveInstrument(symbol, options = {}) {
+
+//     // Direct segment_id format
+//     if (symbol && symbol.includes('_')) {
+
+//         const [seg, id] = symbol.split('_');
+
+//         return {
+//             exchangeSegment: Number(seg),
+//             exchangeInstrumentID: Number(id)
+//         };
+//     }
+
+//     const {
+//         instrumentType = null,
+//         expiry = null,
+//         optionType = null
+//     } = options;
+
+//     const targetSymbol = (symbol || 'NIFTY')
+//         .toUpperCase()
+//         .trim();
+
+//     // Find all matching instruments
+//     let matches = this.instruments.filter(instr => {
+
+//         const name =
+//             instr.name ||
+//             instr.Name ||
+//             instr.UnderlyingIndexName ||
+//             instr.Symbol;
+
+//         return String(name).toUpperCase() === targetSymbol;
+//     });
+
+//     if (matches.length === 0) {
+
+//         console.warn(
+//             `${TAG} Symbol "${targetSymbol}" not found`
+//         );
+
+//         return {
+//             exchangeSegment: 1,
+//             exchangeInstrumentID: Number(targetSymbol) || targetSymbol
+//         };
+//     }
+
+//     // NSEFO only
+//     matches = matches.filter(x =>
+//         Number(x.exchangeSegment || x.ExchangeSegment) === 2
+//     );
+
+//     // FUTURE / OPTION filtering
+//     if (instrumentType !== null) {
+
+//         matches = matches.filter(x =>
+//             Number(
+//                 x.instrumentType ||
+//                 x.InstrumentType
+//             ) === Number(instrumentType)
+//         );
+//     }
+
+//     // CE / PE filtering
+//     if (optionType) {
+
+//         matches = matches.filter(x => {
+
+//             const opt =
+//                 x.optionType ||
+//                 x.OptionType;
+
+//             return String(opt).toUpperCase() === optionType.toUpperCase();
+//         });
+//     }
+
+//     // Expiry filtering
+//     if (expiry) {
+
+//         matches = matches.filter(x => {
+
+//             const exp =
+//                 x.expiry ||
+//                 x.Expiry;
+
+//             return String(exp) === String(expiry);
+//         });
+//     }
+
+//     if (matches.length === 0) {
+
+//         console.warn(
+//             `${TAG} No filtered match for "${targetSymbol}"`
+//         );
+
+//         return null;
+//     }
+
+//     // Nearest expiry first
+//     matches.sort((a, b) => {
+
+//         const ea = new Date(a.expiry || a.Expiry);
+//         const eb = new Date(b.expiry || b.Expiry);
+
+//         return ea - eb;
+//     });
+
+//     const selected = matches[0];
+
+//     console.log(
+//         `${TAG} Resolved "${symbol}" → seg=${selected.exchangeSegment} id=${selected.exchangeInstrumentID}`
+//     );
+
+//     return {
+//         exchangeSegment:
+//             Number(selected.exchangeSegment || selected.ExchangeSegment),
+
+//         exchangeInstrumentID:
+//             Number(selected.exchangeInstrumentID || selected.ExchangeInstrumentID)
+//     };
+// }
+    
     resolveInstrument(symbol) {
         if (symbol && symbol.includes('_')) {
             const [seg, id] = symbol.split('_');

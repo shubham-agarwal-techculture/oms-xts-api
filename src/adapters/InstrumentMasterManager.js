@@ -311,6 +311,31 @@ class InstrumentMasterManager {
         }
 
         console.log(`${TAG} Symbol map built — ${Object.keys(symbolMap).length} entries`);
+
+        // Save symbol map locally as JSON
+
+        const cacheDir = path.join(process.cwd(), 'cache');
+
+        if (!fs.existsSync(cacheDir)) {
+
+            fs.mkdirSync(cacheDir, {
+                recursive: true
+            });
+        }
+
+        const filePath =
+            path.join(cacheDir, 'symbolMap.json');
+
+        fs.writeFileSync(
+            filePath,
+            JSON.stringify(symbolMap, null, 2)
+        );
+
+        console.log(
+            `${TAG} Symbol map saved to ${filePath}`
+        );
+
+
         return symbolMap;
     }
 

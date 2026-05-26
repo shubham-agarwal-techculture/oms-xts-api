@@ -364,10 +364,10 @@ class XTSMarketDataAdapter extends MarketDataProvider {
             }
         ]);
 
-        console.log(
-            `${TAG} QUOTES RESPONSE:`,
-            JSON.stringify(response.data || response, null, 2)
-        );
+        // console.log(
+        //     `${TAG} QUOTES RESPONSE:`,
+        //     JSON.stringify(response.data || response, null, 2)
+        // );
 
         const result = response?.result || response?.data?.result || {};
         const listQuotes = result?.listQuotes || [];
@@ -391,10 +391,10 @@ class XTSMarketDataAdapter extends MarketDataProvider {
                 }
             }
 
-            console.log(
-                `${TAG} PARSED QUOTE:`,
-                JSON.stringify(q, null, 2)
-            );
+            // console.log(
+            //     `${TAG} PARSED QUOTE:`,
+            //     JSON.stringify(q, null, 2)
+            // );
 
             const price =
                 q?.Touchline?.LastTradedPrice ??
