@@ -1,9 +1,12 @@
+const EventEmitter = require('events');
+
 /**
  * Interface for Order Executor.
  * Responsible for placing orders and emitting status updates.
  */
-class OrderExecutor {
+class OrderExecutor extends EventEmitter {
     constructor() {
+        super();
         if (this.constructor === OrderExecutor) {
             throw new Error("Abstract class cannot be instantiated");
         }
@@ -21,8 +24,19 @@ class OrderExecutor {
      * @param {string} [orderDetails.instrumentType] (EQUITY/OPTIONS/FUTURES/COMMODITY)
      * @returns {Promise<Object>} The result of order placement.
      */
+
+    /**
+     * Place an order (market, limit, cover, etc.).
+     * @param {Object} orderDetails 
     async placeOrder(orderDetails) {
         throw new Error("Method 'placeOrder()' must be implemented");
+    }
+
+    /**
+     * Connect to any necessary services (e.g., WebSocket). Must be called before any order actions.
+     */
+    async connect() {
+        // Default no-op for adapters that do not need a persistent connection.
     }
 
     /**

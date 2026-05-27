@@ -2,6 +2,7 @@ const OrderExecutor = require('../interfaces/OrderExecutor');
 const InstrumentMasterManager = require('./InstrumentMasterManager');
 const axios = require('axios');
 const https = require('https');
+const io = require('socket.io-client');
 
 
 const TAG = '[OrderExecutor]';
@@ -124,6 +125,53 @@ class XTSOrderExecutor extends OrderExecutor {
         return { exchangeSegment: 1, exchangeInstrumentID: Number(targetSymbol) || targetSymbol };
     }
 
+    async connect() {
+        // Ensure we are logged in to obtain token and userID
+        if (!this.token) await this.login();
+
+        // Derive base URL and socket.io path from the configured base URL
+        const url = new URL(this.config.baseUrl);
+        const baseUrl = url.origin;
+        const socketPath = url.pathname === '/' ? '/socket.io' : `${url.pathname}/socket.io`;
+
+        console.log(`${TAG} Connecting to Interactive Socket.io at ${baseUrl}${socketPath}`);
+        this.socket = io(baseUrl, {
+            path: socketPath,
+            query: {
+                token: this.token,
+                userID: this.userID,
+                apiType: 'INTERACTIVE',
+                publishFormat: 'JSON',
+                broadcastMode: 'Full',
+                source: 'WebAPI'
+            },
+            transports: ['websocket'],
+            reconnection: true
+        });
+
+        this.socket.on('connect', () => {
+            console.log(`${TAG} Interactive Socket.io connected`);
+            this.emit('connected');
+        });
+
+        const handleOrder = (data) => {
+            try {
+                const orderObj = typeof data === 'string' ? JSON.parse(data) : data;
+                this.emit('orderUpdate', orderObj);
+            } catch (e) {
+                console.warn(`${TAG} Failed to parse order event`, e.message);
+            }
+        };
+        this.socket.on('order', handleOrder);
+        this.socket.on('1105-json-full', handleOrder);
+        this.socket.on('1105-json-fkull', handleOrder);
+
+        this.socket.on('error', (err) => {
+            console.error(`${TAG} Interactive socket error:`, err);
+            this.emit('error', err);
+        });
+    }
+
     async login() {
         console.log(`${TAG} Logging in to XTS Interactive...`);
         try {
@@ -172,6 +220,20 @@ class XTSOrderExecutor extends OrderExecutor {
             const response = await this.client.post('/orders', payload);
             const appOrderID = response.data?.result?.AppOrderID;
             console.log(`${TAG} Order placed — AppOrderID: ${appOrderID}`);
+            // Fetch and log order status immediately after placement
+            try {
+                const statusResp = await this.getOrderStatus(appOrderID);
+                const orderInfo = statusResp?.result?.[0];
+                if (orderInfo) {
+                    const stat = orderInfo.OrderStatus;
+                    const reason = orderInfo.CancelRejectReason || orderInfo.RejectReason || '';
+                    console.log(`${TAG} Order status after placement: ${stat}${reason ? ' – ' + reason : ''}`);
+                } else {
+                    console.warn(`${TAG} Unable to parse order status response`);
+                }
+            } catch (statusErr) {
+                console.warn(`${TAG} Failed to retrieve order status for ${appOrderID}:`, statusErr.message);
+            }
             return response.data;
         } catch (error) {
             const errDetail = error.response?.data?.description || error.response?.data || error.message;

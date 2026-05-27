@@ -191,39 +191,7 @@ class OrderManager extends EventEmitter {
         if (changed) this.schedulePersist();
     }
 
-    init() {
-        console.log(`${TAG} Initializing...`);
-        this.loadPersistedState();
-
-        // Repair any positions missing avg price from market data on startup
-        for (const sym of this.positions.keys()) {
-            const p = this.resolveFillPrice(sym);
-            if (p != null) this.repairPositionsWithUnknownAvg(sym, p);
-        }
-
-        // Listen for signals
-        this.signalSource.on('signal', async (signal) => {
-            const activeSymbol = typeof this.marketData.getActiveSymbol === 'function'
-                ? this.marketData.getActiveSymbol()
-                : null;
-            signal.symbol = this.normalizeSymbol(signal.symbol || activeSymbol || 'NIFTY');
-            this.alerts.push({ ...signal, timestamp: Date.now() });
-            this.emit('alert', signal);
-            try {
-                await this.handleSignal(signal);
-            } finally {
-                this.schedulePersist();
-            }
-        });
-
-        // Listen for price ticks to repair positions
-        this.marketData.on('priceUpdate', ({ symbol, price }) => {
-            this.repairPositionsWithUnknownAvg(symbol, price);
-            this.emit('priceUpdate', { symbol, price });
-        });
-
-        console.log(`${TAG} Ready`);
-    }
+// duplicate init removed
 
     async syncPositions() {
         try {
@@ -276,6 +244,74 @@ class OrderManager extends EventEmitter {
             }
         } catch (error) {
             console.error(`${TAG} Position sync failed:`, error.message);
+        }
+    }
+
+    init() {
+        console.log(`${TAG} Initializing...`);
+        this.loadPersistedState();
+
+        // Establish WebSocket connection for real-time order updates
+        if (typeof this.orderExecutor.connect === 'function') {
+            this.orderExecutor.connect().catch(err => {
+                console.error(`${TAG} OrderExecutor connect failed:`, err.message);
+            });
+        }
+
+        // Listen for order updates from XTS executor
+        this.orderExecutor.on('orderUpdate', (data) => this.handleOrderUpdate(data));
+
+        // Repair any positions missing avg price from market data on startup
+        for (const sym of this.positions.keys()) {
+            const p = this.resolveFillPrice(sym);
+            if (p != null) this.repairPositionsWithUnknownAvg(sym, p);
+        }
+
+        // Listen for signals
+        this.signalSource.on('signal', async (signal) => {
+            const activeSymbol = typeof this.marketData.getActiveSymbol === 'function'
+                ? this.marketData.getActiveSymbol()
+                : null;
+            signal.symbol = this.normalizeSymbol(signal.symbol || activeSymbol || 'NIFTY');
+            this.alerts.push({ ...signal, timestamp: Date.now() });
+            this.emit('alert', signal);
+            try {
+                await this.handleSignal(signal);
+            } finally {
+                this.schedulePersist();
+            }
+        });
+
+        // Listen for price ticks to repair positions
+        this.marketData.on('priceUpdate', ({ symbol, price }) => {
+            this.repairPositionsWithUnknownAvg(symbol, price);
+            this.emit('priceUpdate', { symbol, price });
+        });
+
+        console.log(`${TAG} Ready`);
+    }
+
+    handleOrderUpdate(data) {
+        console.log(`${TAG} Received order update:`, JSON.stringify(data));
+        this.emit('order', data);
+
+        // If order is filled, attempt to update positions
+        if (data.status === 'FILLED' || data.orderStatus === 'Filled') {
+            const symbol = this.normalizeSymbol(data.symbol || data.TradingSymbol);
+            const qty = Number(data.filledQty || data.FilledQuantity || 0);
+            const price = Number(data.fillPrice || data.AveragePrice || 0);
+            const action = (data.side || data.OrderSide || '').toUpperCase();
+
+            if (qty > 0 && price > 0) {
+                this.updatePosition(symbol, action, qty, price);
+            }
+        }
+        // Handle rejected orders – log the cancel/reject reason if provided
+        if (data.status === 'Rejected' || data.orderStatus === 'Rejected') {
+            const reason = data.CancelRejectReason || data.RejectReason || 'No reason provided';
+            console.warn(`${TAG} Order ${data.OrderReferenceID || data.AppOrderID || ''} was rejected: ${reason}`);
+            // Emit a rejection event for UI or listeners
+            this.emit('orderRejected', data);
         }
     }
 
