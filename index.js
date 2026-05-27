@@ -36,11 +36,20 @@ function createOrderExecutor() {
 }
 
 async function main() {
+
+
     try {
+        
+        const marketDataConfig = {
+            baseUrl: process.env.XTS_MARKET_DATA_URL,
+            appKey: process.env.XTS_MARKET_DATA_APP_KEY,
+            secretKey: process.env.XTS_MARKET_DATA_SECRET_KEY
+        };
+
         // 1. Initialize Adapters
         const marketData = createMarketData();
         const signalSource = new RESTSignalReceiver(process.env.SIGNAL_PORT || 5001);
-        const orderExecutor = createOrderExecutor();
+        const orderExecutor = new XTSOrderExecutor(marketDataConfig);
 
         // 2. Initialize Core
         const oms = new OrderManager({
@@ -59,7 +68,9 @@ async function main() {
         
         // Load instrument masters and symbol map
         console.log('Loading instrument masters...');
-        await orderExecutor.loadSymbolMap(['NSECM', 'NSEFO']); // Load NSECM (spot) and NSEFO (options) segments
+        // await orderExecutor.loadSymbolMap(['NSECM', 'NSEFO']); // Load NSECM (spot) and NSEFO (options) segments
+
+        await orderExecutor.loadSymbolMap(['NSEFO']); // Load NSECM (spot) and NSEFO (options) segments
 
         // Subscribe to underlying instrument (e.g., NIFTY spot - exchangeSegment=1, exchangeInstrumentID=26000)
         try {

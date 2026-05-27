@@ -1,7 +1,7 @@
 const axios = require('axios');
 
 const testSignal = {
-    symbol: 'SWIGGY',
+    symbol: 'tcs',
     action: 'buy',
     quantity: 1,
     position: 'long',

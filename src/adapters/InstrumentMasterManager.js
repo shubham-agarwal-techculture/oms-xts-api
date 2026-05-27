@@ -91,6 +91,8 @@ class InstrumentMasterManager {
         
         // Split by newlines first - each line is an instrument
         const instrumentLines = pipeData.split('\n').filter(line => line.trim());
+
+        console.log(`${TAG} instrument line: ${instrumentLines[0]}`)
         
         for (const line of instrumentLines) {
             const parts = line.split('|');
@@ -100,70 +102,132 @@ class InstrumentMasterManager {
                 const instrument = {
                     exchangeSegmentCode,
                     exchangeSegment: this.segmentCodeToId[exchangeSegmentCode] || 1,
-                    
-                    // Field 0: Exchange Segment
-                    instrumentType: parts[0],
-                    
-                    // Field 1: Exchange Instrument ID
+
+                    // Column 1: Exchange Segment (already provided as exchangeSegmentCode)
+                    InstrumentType: parts[2], // InstrumentType
+
+                    // Column 2: Exchange Instrument ID
                     exchangeInstrumentID: parts[1] ? parseInt(parts[1], 10) : null,
-                    
-                    // Field 2: ?
-                    field2: parts[2],
-                    
-                    // Field 3: Symbol (Underlying)
+
+                   
+                    // Column 4: Name (Underlying Symbol)
                     symbol: parts[3],
-                    
-                    // Field 4: Trading Symbol
-                    tradingSymbol: parts[4],
-                    
-                    // Field 5: Instrument Type Name
-                    instrumentTypeName: parts[5],
-                    
-                    // Field 6: ?
-                    field6: parts[6],
-                    
-                    // Field 7: ?
-                    field7: parts[7],
-                    
-                    // Field 8: Price Numerator
-                    priceNumerator: parts[8],
-                    
-                    // Field 9: Price Denominator
-                    priceDenominator: parts[9],
-                    
-                    // Field 10: ?
-                    field10: parts[10],
-                    
-                    // Field 11: Tick Size
+
+                    // Column 5: Description (may contain option type info)
+                    description: parts[4],
+
+                    // Column 6: Series
+                    series: parts[5],
+
+                    // Column 7: NameWithSeries (Trading Symbol)
+                    tradingSymbol: parts[6],
+
+                    // Column 8: Instrument ID (unused, kept for reference)
+                    instrumentId: parts[7],
+
+                    // Column 9: Price Band High
+                    priceBandHigh: parts[8] ? parseFloat(parts[8]) : null,
+
+                    // Column 10: Price Band Low
+                    priceBandLow: parts[9] ? parseFloat(parts[9]) : null,
+
+                    // Column 11: Freeze Qty
+                    freezeQty: parts[10] ? parseInt(parts[10], 10) : null,
+
+                    // Column 12: Tick Size
                     tickSize: parts[11] ? parseFloat(parts[11]) : null,
-                    
-                    // Field 12: Lot Size
+
+                    // Column 13: Lot Size
                     lotSize: parts[12] ? parseInt(parts[12], 10) : null,
-                    
-                    // Field 13: ?
-                    field13: parts[13],
-                    
-                    // Field 14: ?
-                    field14: parts[14],
-                    
-                    // Field 15: Symbol again?
-                    field15: parts[15],
-                    
-                    // Field 16: Expiry Date (ISO format: YYYY-MM-DDTHH:mm:ss)
+
+                    // Column 14: Multiplier
+                    multiplier: parts[13] ? parseFloat(parts[13]) : null,
+
+                    // Column 15: Underlying Instrument Id
+                    underlyingInstrumentId: parts[14] ? parseInt(parts[14], 10) : null,
+
+                    // Column 16: Underlying Index Name
+                    underlyingIndexName: parts[15],
+
+                    // Column 17: Contract Expiration (ISO datetime)
                     expiry: parts[16],
-                    
-                    // Field 17: Strike Price
+
+                    // Column 18: Strike Price
                     strikePrice: parts[17] ? parseFloat(parts[17]) : null,
-                    
-                    // Field 18: ?
-                    field18: parts[18],
-                    
-                    // Field 19: Description (contains option type)
-                    description: parts[19],
-                    
-                    // Additional fields (if any)
+
+                    // Column 19: Option Type (CE/PE)
+                    optionType: parts[18],
+
+                    // Keep raw parts for any future reference
                     raw: parts
                 };
+
+                //     exchangeSegmentCode,
+                //     exchangeSegment: this.segmentCodeToId[exchangeSegmentCode] || 1,
+                    
+                //     // Field 0: Exchange Segment
+                //     instrumentType: parts[0],
+                    
+                //     // Field 1: Exchange Instrument ID
+                //     exchangeInstrumentID: parts[1] ? parseInt(parts[1], 10) : null,
+                    
+                //     // Field 2: ?
+                //     field2: parts[2],
+                    
+                //     // Field 3: Symbol (Underlying)
+                //     symbol: parts[3],
+                    
+                //     // Field 4: Trading Symbol
+                //     tradingSymbol: parts[4],
+                    
+                //     // Field 5: Instrument Type Name
+                //     instrumentTypeName: parts[5],
+                    
+                //     // Field 6: ?
+                //     field6: parts[6],
+                    
+                //     // Field 7: ?
+                //     field7: parts[7],
+                    
+                //     // Field 8: Price Numerator
+                //     priceNumerator: parts[8],
+                    
+                //     // Field 9: Price Denominator
+                //     priceDenominator: parts[9],
+                    
+                //     // Field 10: ?
+                //     field10: parts[10],
+                    
+                //     // Field 11: Tick Size
+                //     tickSize: parts[11] ? parseFloat(parts[11]) : null,
+                    
+                //     // Field 12: Lot Size
+                //     lotSize: parts[12] ? parseInt(parts[12], 10) : null,
+                    
+                //     // Field 13: ?
+                //     field13: parts[13],
+                    
+                //     // Field 14: ?
+                //     field14: parts[14],
+                    
+                //     // Field 15: Symbol again?
+                //     field15: parts[15],
+                    
+                //     // Field 16: Expiry Date (ISO format: YYYY-MM-DDTHH:mm:ss)
+                //     expiry: parts[16],
+                    
+                //     // Field 17: Strike Price
+                //     strikePrice: parts[17] ? parseFloat(parts[17]) : null,
+                    
+                //     // Field 18: ?
+                //     field18: parts[18],
+                    
+                //     // Field 19: Description (contains option type)
+                //     description: parts[19],
+                    
+                //     // Additional fields (if any)
+                //     raw: parts
+                // };
                 
                 // Parse expiry date from field 16 (ISO format)
                 if (instrument.expiry) {
