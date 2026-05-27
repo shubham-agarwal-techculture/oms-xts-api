@@ -21,7 +21,8 @@ function createMarketData() {
     });
 }
 
-function createOrderExecutor(marketDataConfig) {
+
+function createOrderExecutor() {
     if (process.env.ORDER_EXECUTOR === 'mock') {
         console.log('Using MockOrderExecutor (no broker API calls)');
         return new MockOrderExecutor();
@@ -31,21 +32,15 @@ function createOrderExecutor(marketDataConfig) {
         appKey: process.env.XTS_INTERACTIVE_APP_KEY,
         secretKey: process.env.XTS_INTERACTIVE_SECRET_KEY,
         userId: process.env.XTS_INTERACTIVE_USER_ID,
-        marketDataConfig: marketDataConfig
     });
 }
 
 async function main() {
     try {
         // 1. Initialize Adapters
-        const marketDataConfig = {
-            baseUrl: process.env.XTS_MARKET_DATA_URL,
-            appKey: process.env.XTS_MARKET_DATA_APP_KEY,
-            secretKey: process.env.XTS_MARKET_DATA_SECRET_KEY
-        };
-        const marketData = new XTSMarketDataAdapter(marketDataConfig);
+        const marketData = createMarketData();
         const signalSource = new RESTSignalReceiver(process.env.SIGNAL_PORT || 5001);
-        const orderExecutor = createOrderExecutor(marketDataConfig);
+        const orderExecutor = createOrderExecutor();
 
         // 2. Initialize Core
         const oms = new OrderManager({
